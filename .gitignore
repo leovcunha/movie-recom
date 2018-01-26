@@ -1,0 +1,13 @@
+#Dependency directories
+node_modules
+jspm_packages
+node
+
+**/target
+
+#Logs
+*.log
+npm-debug.log*
+
+#others
+.codeenvy.json

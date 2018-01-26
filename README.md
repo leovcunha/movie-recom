@@ -1,19 +1,23 @@
-# web-java-spring-boot
+# Movie Recommendation System 
 
-# Developer Workspace
+Implementation of a netflix-like recommendation system 
 
-[![Contribute](http://beta.codenvy.com/factory/resources/codenvy-contribute.svg)](http://beta.codenvy.com/f?id=sz7uzyofb8olekkn)
+* User chooses 5 movies he watched and liked from a list
+* Based on previous info the system will recommend to user some movies to watch 
 
-# Recipe
 
-FROM [codenvy/ubuntu_jdk8](https://hub.docker.com/r/codenvy/ubuntu_jdk8/)
+## Overall architecture
 
-# Commands
+Microservice-based
 
-| #       | Command           | 
-| :------------- |:------------- |
-| 1      | `cd ${current.project.path} && mvn spring-boot:run` |
 
-# Preview URL
 
-The app runs on port 8080 in the container
+## Stack
+
+**Frontend:** 
+React stack
+
+**Backend:**
+MovieDB API
+Java 
+Spring Boot
