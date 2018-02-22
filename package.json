@@ -4,6 +4,7 @@
   "description": "movie recommendation app built with spring-boot-java-reactjs",
   "main": "./src/frontend",
   "scripts": {
+    "start": "webpack-dev-server --open",
     "build": "webpack -p"
   },
   "author": "",

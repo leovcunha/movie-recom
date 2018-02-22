@@ -6,8 +6,22 @@ module.exports = {
 
   output: {
     path: __dirname,
-    filename: './src/main/resources/static/built/app-bundle.js'
+    filename: './src/main/resources/static/built/app-bundle.js',
   }, 
+
+  devServer: {
+
+    contentBase: './src/main/resources/',
+
+    proxy: {  
+     '/api/*': {
+       target: 'http://localhost:8080',
+       secure: false
+     
+      }   
+    }
+    
+   },
    module: {
   rules: [
     {

@@ -113,9 +113,7 @@
                     <goals>
                         <goal>webpack</goal>
                     </goals>
-                             
-
-                   </execution>
+                  </execution>
         
                 </executions>
             </plugin>

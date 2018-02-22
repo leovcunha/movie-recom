@@ -978,7 +978,7 @@ var App = function (_React$Component) {
         React.createElement(
           'h1',
           null,
-          'Hello, world!'
+          'Hello, Spectator! What are you watching?'
         ),
         React.createElement(
           'h2',
