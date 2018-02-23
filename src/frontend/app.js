@@ -15,7 +15,7 @@ componentWillUnmount() {
 render() {
     return (
       <div>
-        <h1>Hello, Spectator! What are you watching?</h1>
+        <h1>Hi, Spectators!</h1>
         <h2>It is {this.state.date.toLocaleTimeString()}.</h2>
       </div>
     );

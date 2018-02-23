@@ -1,25 +1,41 @@
 const path = require('path');
 const webpack = require('webpack');
+const HtmlWebpackPlugin = require('html-webpack-plugin');
 
 module.exports = {
   entry: './src/frontend/app.js',
 
   output: {
-    path: __dirname,
-    filename: './src/main/resources/static/built/app-bundle.js',
+    path: path.resolve(__dirname, 'src/main/resources/static/built'),
+    filename: 'app-bundle.js',
+    publicPath: '/'
   }, 
+
+  plugins: [
+
+    new HtmlWebpackPlugin({ //dev
+        hash: true,
+        template: 'src/main/resources/templates/template.html',
+    }),
+    new HtmlWebpackPlugin({ //production
+        hash: false,
+        template: 'src/main/resources/templates/template.html',
+        filename: path.join(__dirname, 'src/main/resources/templates/index.html')
+    })
+  ],
 
   devServer: {
 
-    contentBase: './src/main/resources/',
+    contentBase: './src/main/resources/templates/',
 
     proxy: {  
      '/api/*': {
        target: 'http://localhost:8080',
-       secure: false
+       secure: false,
+       publicPath: "/"
      
-      }   
-    }
+      },
+    },
     
    },
    module: {
