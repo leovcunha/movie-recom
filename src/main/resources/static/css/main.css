@@ -1,0 +1,15 @@
+body {
+    background-color: rgb(44, 44, 44);
+    font-family: Arial, Helvetica, Sans-Serif;
+	color:rgb(230, 230, 230);
+}
+
+header ul#nav {
+    list-style: none;
+    float: right;
+}
+
+ul#nav>li {
+    display: inline;
+    padding: 10px;
+}

@@ -6,8 +6,8 @@ module.exports = {
   entry: './src/frontend/app.js',
 
   output: {
-    path: path.resolve(__dirname, 'src/main/resources/static/built'),
-    filename: 'app-bundle.js',
+    path: path.resolve(__dirname, 'src/main/resources/static/'),
+    filename: 'built/app-bundle.js',
     publicPath: '/'
   }, 
 
@@ -26,7 +26,7 @@ module.exports = {
 
   devServer: {
 
-    contentBase: './src/main/resources/templates/',
+    contentBase: './src/main/resources/static/',
 
     proxy: {  
      '/api/*': {
