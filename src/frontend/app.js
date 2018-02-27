@@ -1,18 +1,26 @@
 import React from 'react';
 import ReactDOM from 'react-dom';
-import mdb from './config/mdbkey';
+import { discoverMovies } from './actions/discoverMovies'
+import axios from 'axios'
+const APIKEY = 'api_key=9624561704e52e84ae59cd0147eb662d'
 
 class App extends React.Component {
   constructor(props) {
     super(props);
     this.state = {
         date: new Date(),
-        mkey: mdb.key
+        movieList: {}
+
     }
   }
 componentDidMount() {
+    console.log(this.state.movieList);    
 }
-componentWillUnmount() {
+componentWillMount() {
+    axios.get(`https://api.themoviedb.org/3/discover/movie?${APIKEY}&language=en-US&page=1`) .then(res => {
+        const movieList = res.data;
+        this.setState({ movieList });
+    });
 }
 
 render() {
@@ -27,7 +35,7 @@ render() {
             </ul>
         </header>
         <h2>It is {this.state.date.toLocaleTimeString()}.</h2>
-        <h2>key is {this.state.mkey}  </h2>
+        
       </div>
     );
   }
