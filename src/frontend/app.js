@@ -1,8 +1,6 @@
 import React from 'react';
 import ReactDOM from 'react-dom';
-import { discoverMovies } from './actions/discoverMovies'
-import axios from 'axios'
-const APIKEY = 'api_key=9624561704e52e84ae59cd0147eb662d'
+import { discoverMovies } from './actions/discoverMovies';
 
 class App extends React.Component {
   constructor(props) {
@@ -11,19 +9,20 @@ class App extends React.Component {
         date: new Date(),
         movieList: {}
 
-    }
+    };
   }
 componentDidMount() {
-    console.log(this.state.movieList);    
-}
-componentWillMount() {
-    axios.get(`https://api.themoviedb.org/3/discover/movie?${APIKEY}&language=en-US&page=1`) .then(res => {
+    discoverMovies().then(res => {
         const movieList = res.data;
         this.setState({ movieList });
-    });
+    });   
+}
+componentWillMount() {
+
 }
 
 render() {
+    console.log(this.state.movieList);
     return (
       <div>
         <header>
