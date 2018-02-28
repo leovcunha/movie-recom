@@ -1,6 +1,9 @@
+/*eslint-env es_modules */
 import React from 'react';
 import ReactDOM from 'react-dom';
 import { discoverMovies } from './actions/discoverMovies';
+import Header from './components/Header';
+import MovieTable from './components/MovieTable';
 
 class App extends React.Component {
   constructor(props) {
@@ -17,24 +20,22 @@ componentDidMount() {
         this.setState({ movieList });
     });   
 }
-componentWillMount() {
 
+renderMovieTable() {
+    let MovieTab = <h4>Loading..</h4>
+    if (this.state.movieList != {}) {
+        MovieTab = <MovieTable movies={this.state.movieList.results} />;
+    }
+    return MovieTab;
 }
 
 render() {
-    console.log(this.state.movieList);
+    console.log(this.state.movieList)
+
     return (
       <div>
-        <header>
-            <h1>Movie Recommendations</h1>
-            <ul id="nav">
-                <li className="item1">1</li>
-                <li className="item2">2</li>
-                <li className="item3">3</li>
-            </ul>
-        </header>
-        <h2>It is {this.state.date.toLocaleTimeString()}.</h2>
-        
+        <Header />
+        {this.renderMovieTable()}
       </div>
     );
   }
