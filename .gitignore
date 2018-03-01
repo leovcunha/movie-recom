@@ -11,3 +11,4 @@ npm-debug.log*
 
 #others
 .codeenvy.json
+.DS_Store
