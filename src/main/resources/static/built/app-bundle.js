@@ -1657,8 +1657,10 @@ var App = function (_React$Component) {
         var _this = _possibleConstructorReturn(this, (App.__proto__ || Object.getPrototypeOf(App)).call(this, props));
 
         _this.state = {
-            date: new Date(),
-            movieList: {}
+            isLoading: false,
+            movieList: {
+                results: []
+            }
 
         };
         return _this;
@@ -1669,34 +1671,29 @@ var App = function (_React$Component) {
         value: function componentDidMount() {
             var _this2 = this;
 
+            this.setState({ isLoading: true });
             (0, _discoverMovies.discoverMovies)().then(function (res) {
                 var movieList = res.data;
-                _this2.setState({ movieList: movieList });
+                _this2.setState({ movieList: movieList, isLoading: false });
             });
-        }
-    }, {
-        key: 'renderMovieTable',
-        value: function renderMovieTable() {
-            var MovieTab = _react2.default.createElement(
-                'h4',
-                null,
-                'Loading..'
-            );
-            if (this.state.movieList != {}) {
-                MovieTab = _react2.default.createElement(_MovieTable2.default, { movies: this.state.movieList.results });
-            }
-            return MovieTab;
         }
     }, {
         key: 'render',
         value: function render() {
+
             console.log(this.state.movieList);
 
             return _react2.default.createElement(
                 'div',
                 null,
                 _react2.default.createElement(_Header2.default, null),
-                this.renderMovieTable()
+                this.state.isLoading ? //if (isLoading)
+                _react2.default.createElement(
+                    'p',
+                    null,
+                    'Loading...'
+                ) : //else
+                _react2.default.createElement(_MovieTable2.default, { movies: this.state.movieList.results })
             );
         }
     }]);
@@ -20022,7 +20019,7 @@ var MovieTable = function (_React$Component) {
         key: 'listMovies',
         value: function listMovies() {
             return this.props.movies.map(function (movieData) {
-                _react2.default.createElement(_MovieHolder2.default, { key: movieData.id, movie: movieData });
+                return _react2.default.createElement(_MovieHolder2.default, { key: movieData.id, movie: movieData });
             });
         }
     }, {
@@ -20050,7 +20047,7 @@ exports.default = MovieTable;
 
 
 Object.defineProperty(exports, "__esModule", {
-  value: true
+    value: true
 });
 exports.default = MovieHolder;
 
@@ -20061,15 +20058,7 @@ var _react2 = _interopRequireDefault(_react);
 function _interopRequireDefault(obj) { return obj && obj.__esModule ? obj : { default: obj }; }
 
 function MovieHolder(props) {
-  return _react2.default.createElement(
-    'div',
-    null,
-    _react2.default.createElement(
-      'h4',
-      null,
-      props.movie.title
-    )
-  );
+    return _react2.default.createElement("img", { className: "mov-img", src: "http://image.tmdb.org/t/p/w185" + props.movie.poster_path });
 }
 
 /***/ })

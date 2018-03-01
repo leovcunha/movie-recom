@@ -9,33 +9,34 @@ class App extends React.Component {
   constructor(props) {
     super(props);
     this.state = {
-        date: new Date(),
-        movieList: {}
+        isLoading: false,
+        movieList: {
+            results: []
+        }
 
     };
   }
 componentDidMount() {
+    this.setState({isLoading: true})
     discoverMovies().then(res => {
         const movieList = res.data;
-        this.setState({ movieList });
+        this.setState({ movieList, isLoading: false });
     });   
 }
 
-renderMovieTable() {
-    let MovieTab = <h4>Loading..</h4>
-    if (this.state.movieList != {}) {
-        MovieTab = <MovieTable movies={this.state.movieList.results} />;
-    }
-    return MovieTab;
-}
-
 render() {
-    console.log(this.state.movieList)
 
+    console.log(this.state.movieList)
+    
     return (
       <div>
         <Header />
-        {this.renderMovieTable()}
+        {this.state.isLoading? ( //if (isLoading)
+             <p>Loading...</p>
+             ) : (    //else
+             <MovieTable movies={this.state.movieList.results} />
+             )
+         }
       </div>
     );
   }

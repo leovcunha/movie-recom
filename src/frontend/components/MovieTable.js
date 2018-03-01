@@ -9,7 +9,7 @@ export default class MovieTable extends React.Component {
     listMovies() {
         return (
           this.props.movies.map((movieData) => {
-            <MovieHolder key={movieData.id} movie={movieData}/>             
+            return <MovieHolder key={movieData.id} movie={movieData}/>             
           })
         )
     }
