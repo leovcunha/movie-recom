@@ -4,12 +4,39 @@ body {
 	color:rgb(230, 230, 230);
 }
 
+header {
+	display: flex;
+	align-items: center;
+	flex-wrap: wrap;
+}
+
 header ul#nav {
     list-style: none;
     float: right;
+    text-align: center;
+}
+
+header h1 {
+    float: left;
+    text-align: center;
+    
 }
 
 ul#nav>li {
     display: inline;
     padding: 10px;
+}
+
+.mov-img {
+	padding: 1%;
+	
+}
+
+.movietable {
+    display: inline-flex;
+    flex-wrap: wrap;
+	justify-content: space-around;
+	max-width: 1200px;
+	align: center;
+
 }
