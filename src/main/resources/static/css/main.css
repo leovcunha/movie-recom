@@ -37,6 +37,6 @@ ul#nav>li {
     flex-wrap: wrap;
 	justify-content: space-around;
 	max-width: 1200px;
-	align: center;
+	margin: auto;
 
 }
