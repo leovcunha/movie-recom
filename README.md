@@ -2,20 +2,24 @@
 
 Implementation of a netflix-like recommendation system 
 
-* User chooses 5 movies he watched and liked from a list
+## 'User' Requirements
 * Based on previous info the system will recommend to user some movies to watch 
+* enter the site and login with email
+* see a table of popular movies and rank at least 10 movies he watched 
+* after saving , system will calculate recommendations based on user prefs and show him 
 
 
-## Overall architecture
+## Design / architecture decisions
 
 Microservice-based
 
-
-
-## Stack
+## Technologies
 
 **Frontend:** 
-React stack
+React
+Axios
+Webpack
+HTML/CSS
 
 **Backend:**
 MovieDB API
