@@ -12,8 +12,11 @@ header {
 
 header ul#nav {
     list-style: none;
-    float: right;
     text-align: center;
+    position: relative;
+    left: 55%;
+
+
 }
 
 header h1 {
@@ -33,10 +36,11 @@ ul#nav>li {
 }
 
 .movietable {
-    display: inline-flex;
+    display: flex;
     flex-wrap: wrap;
 	justify-content: space-around;
 	max-width: 1200px;
 	margin: auto;
+	
 
 }
