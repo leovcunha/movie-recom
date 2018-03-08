@@ -20029,7 +20029,21 @@ var MovieTable = function (_React$Component) {
             return _react2.default.createElement(
                 'div',
                 { className: 'movietable' },
-                this.listMovies()
+                _react2.default.createElement(
+                    'i',
+                    { className: 'material-icons arrow-left' },
+                    'chevron_left'
+                ),
+                _react2.default.createElement(
+                    'div',
+                    { className: 'movielist' },
+                    this.listMovies()
+                ),
+                _react2.default.createElement(
+                    'i',
+                    { className: 'material-icons arrow-right' },
+                    'chevron_right'
+                )
             );
         }
     }]);

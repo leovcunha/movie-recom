@@ -2,20 +2,26 @@ body {
     background-color: rgb(44, 44, 44);
     font-family: Arial, Helvetica, Sans-Serif;
 	color:rgb(230, 230, 230);
-}
+	}
 
 header {
+	position: relative;
 	display: flex;
 	align-items: center;
 	flex-wrap: wrap;
+	margin: auto;
+	width: 100%;
+	max-width: 1400px;
+
+
 }
 
-header ul#nav {
+ul#nav {
     list-style: none;
     text-align: center;
-    position: relative;
-    left: 55%;
-
+    position: absolute;
+    right: 0;
+    top: 20%;
 
 }
 
@@ -35,12 +41,25 @@ ul#nav>li {
 	
 }
 
-.movietable {
+.movielist {
     display: flex;
     flex-wrap: wrap;
 	justify-content: space-around;
-	max-width: 1200px;
+	max-width: 1100px;
 	margin: auto;
-	
 
+}
+
+.movietable {
+	position: relative;
+	display: grid;
+	grid-template-columns: 1fr 10fr 1fr;
+	margin:auto;
+	width: 100%;
+	max-width: 1400px;
+
+}
+
+.arrow-left {
+	text-align: right;
 }

@@ -17,9 +17,13 @@ export default class MovieTable extends React.Component {
     render() {
         
         return (
-            <div className='movietable'>
-                {this.listMovies()}
-            </div>        
+            <div className="movietable">
+                <i className="material-icons arrow-left">chevron_left</i>       
+                <div className="movielist">
+                    {this.listMovies()}
+                </div>
+                <i className="material-icons arrow-right">chevron_right</i>
+            </div>
         );
     }
     
