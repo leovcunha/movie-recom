@@ -1656,8 +1656,11 @@ var App = function (_React$Component) {
 
         var _this = _possibleConstructorReturn(this, (App.__proto__ || Object.getPrototypeOf(App)).call(this, props));
 
+        _this.pageHandler = _this.pageHandler.bind(_this);
+
         _this.state = {
             isLoading: false,
+            moviePage: 1,
             movieList: {
                 results: []
             }
@@ -1678,10 +1681,23 @@ var App = function (_React$Component) {
             });
         }
     }, {
+        key: 'pageHandler',
+        value: function pageHandler(increm) {
+            var mp = this.state.moviePage;
+            if (increm) {
+                mp = mp + 1;
+            } else if (!increm && mp > 1) {
+                mp = mp - 1;
+            }
+
+            this.setState({
+                moviePage: mp
+            });
+            console.log(mp);
+        }
+    }, {
         key: 'render',
         value: function render() {
-
-            console.log(this.state.movieList);
 
             return _react2.default.createElement(
                 'div',
@@ -1693,7 +1709,7 @@ var App = function (_React$Component) {
                     null,
                     'Loading...'
                 ) : //else
-                _react2.default.createElement(_MovieTable2.default, { movies: this.state.movieList.results })
+                _react2.default.createElement(_MovieTable2.default, { movies: this.state.movieList.results, pagehandler: this.pageHandler })
             );
         }
     }]);
@@ -19031,7 +19047,9 @@ function _interopRequireDefault(obj) { return obj && obj.__esModule ? obj : { de
 
 var APIKEY = 'api_key=9624561704e52e84ae59cd0147eb662d'; /*eslint-env es_modules */
 var discoverMovies = exports.discoverMovies = function discoverMovies() {
-    return _axios2.default.get('https://api.themoviedb.org/3/discover/movie?' + APIKEY + '&language=en-US&page=1');
+    var pg = arguments.length > 0 && arguments[0] !== undefined ? arguments[0] : 1;
+
+    return _axios2.default.get('https://api.themoviedb.org/3/discover/movie?' + APIKEY + '&language=en-US&page={pg}&sort_by=popularity.desc');
 };
 
 /***/ }),
@@ -20025,13 +20043,17 @@ var MovieTable = function (_React$Component) {
     }, {
         key: 'render',
         value: function render() {
+            var _this2 = this;
 
             return _react2.default.createElement(
                 'div',
                 { className: 'movietable' },
                 _react2.default.createElement(
                     'i',
-                    { className: 'material-icons arrow-left' },
+                    { className: 'material-icons arrow-left', onClick: function onClick() {
+                            var pass = arguments.length > 0 && arguments[0] !== undefined ? arguments[0] : false;
+                            return _this2.props.pagehandler(pass);
+                        } },
                     'chevron_left'
                 ),
                 _react2.default.createElement(
@@ -20041,7 +20063,10 @@ var MovieTable = function (_React$Component) {
                 ),
                 _react2.default.createElement(
                     'i',
-                    { className: 'material-icons arrow-right' },
+                    { className: 'material-icons arrow-right', onClick: function onClick() {
+                            var pass = arguments.length > 0 && arguments[0] !== undefined ? arguments[0] : true;
+                            return _this2.props.pagehandler(pass);
+                        } },
                     'chevron_right'
                 )
             );

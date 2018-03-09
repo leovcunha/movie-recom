@@ -30,30 +30,29 @@ componentDidMount() {
 
 pageHandler(increm) {
     let mp = this.state.moviePage;
-    if increm {
+    if (increm) {
         mp =  mp + 1;
     } 
-    else if (mp > 1) {
+    else if (!increm && mp > 1) {
         mp = mp - 1;
     }
 
     this.setState({
         moviePage: mp
     }); 
+    console.log(mp);
     
 }
 
 render() {
 
-    console.log(this.state.movieList);
-    
     return (
       <div>
         <Header />
         {this.state.isLoading? ( //if (isLoading)
              <p>Loading...</p>
              ) : (    //else
-             <MovieTable movies={this.state.movieList.results} />
+             <MovieTable movies={this.state.movieList.results} pagehandler={this.pageHandler}/>
              )
          }
       </div>

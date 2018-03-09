@@ -18,11 +18,13 @@ export default class MovieTable extends React.Component {
         
         return (
             <div className="movietable">
-                <i className="material-icons arrow-left">chevron_left</i>       
+                <i className="material-icons arrow-left" onClick={() => 
+                    this.props.pagehandler(false)}>chevron_left</i>       
                 <div className="movielist">
                     {this.listMovies()}
                 </div>
-                <i className="material-icons arrow-right">chevron_right</i>
+                <i className="material-icons arrow-right" onClick={() => 
+                    this.props.pagehandler(true)}>chevron_right</i>
             </div>
         );
     }
