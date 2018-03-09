@@ -26,9 +26,9 @@ componentDidMount() {
 
 triggerMoviesUpdate() {
     this.setState({isLoading: true});
-    discoverMovies(this.state.moviePage).then(res => {
+    discoverMovies(this.state.moviePage.toString()).then(res => {
         const movieList = res.data;
-        this.setState({ movieList, isLoading: false });
+        return this.setState({ movieList, isLoading: false });
     });   
 }
 
@@ -44,9 +44,7 @@ pageHandler(increm) {
     this.setState({
         moviePage: mp
     }, () => this.triggerMoviesUpdate()); 
-    
-    console.log(mp);
-    
+       
 }
 
 render() {
