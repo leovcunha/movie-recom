@@ -1672,10 +1672,15 @@ var App = function (_React$Component) {
     _createClass(App, [{
         key: 'componentDidMount',
         value: function componentDidMount() {
+            this.triggerMoviesUpdate();
+        }
+    }, {
+        key: 'triggerMoviesUpdate',
+        value: function triggerMoviesUpdate() {
             var _this2 = this;
 
             this.setState({ isLoading: true });
-            (0, _discoverMovies.discoverMovies)().then(function (res) {
+            (0, _discoverMovies.discoverMovies)(this.state.moviePage).then(function (res) {
                 var movieList = res.data;
                 _this2.setState({ movieList: movieList, isLoading: false });
             });
@@ -1683,6 +1688,8 @@ var App = function (_React$Component) {
     }, {
         key: 'pageHandler',
         value: function pageHandler(increm) {
+            var _this3 = this;
+
             var mp = this.state.moviePage;
             if (increm) {
                 mp = mp + 1;
@@ -1692,7 +1699,10 @@ var App = function (_React$Component) {
 
             this.setState({
                 moviePage: mp
+            }, function () {
+                return _this3.triggerMoviesUpdate();
             });
+
             console.log(mp);
         }
     }, {
@@ -20051,8 +20061,7 @@ var MovieTable = function (_React$Component) {
                 _react2.default.createElement(
                     'i',
                     { className: 'material-icons arrow-left', onClick: function onClick() {
-                            var pass = arguments.length > 0 && arguments[0] !== undefined ? arguments[0] : false;
-                            return _this2.props.pagehandler(pass);
+                            return _this2.props.pagehandler(false);
                         } },
                     'chevron_left'
                 ),
@@ -20064,8 +20073,7 @@ var MovieTable = function (_React$Component) {
                 _react2.default.createElement(
                     'i',
                     { className: 'material-icons arrow-right', onClick: function onClick() {
-                            var pass = arguments.length > 0 && arguments[0] !== undefined ? arguments[0] : true;
-                            return _this2.props.pagehandler(pass);
+                            return _this2.props.pagehandler(true);
                         } },
                     'chevron_right'
                 )
