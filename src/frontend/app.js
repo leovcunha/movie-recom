@@ -21,8 +21,12 @@ class App extends React.Component {
     };
   }
 componentDidMount() {
+    this.triggerMoviesUpdate();
+}
+
+triggerMoviesUpdate() {
     this.setState({isLoading: true});
-    discoverMovies().then(res => {
+    discoverMovies(this.state.moviePage).then(res => {
         const movieList = res.data;
         this.setState({ movieList, isLoading: false });
     });   
@@ -39,7 +43,8 @@ pageHandler(increm) {
 
     this.setState({
         moviePage: mp
-    }); 
+    }, () => this.triggerMoviesUpdate()); 
+    
     console.log(mp);
     
 }
