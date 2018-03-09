@@ -1680,9 +1680,9 @@ var App = function (_React$Component) {
             var _this2 = this;
 
             this.setState({ isLoading: true });
-            (0, _discoverMovies.discoverMovies)(this.state.moviePage).then(function (res) {
+            (0, _discoverMovies.discoverMovies)(this.state.moviePage.toString()).then(function (res) {
                 var movieList = res.data;
-                _this2.setState({ movieList: movieList, isLoading: false });
+                return _this2.setState({ movieList: movieList, isLoading: false });
             });
         }
     }, {
@@ -1702,8 +1702,6 @@ var App = function (_React$Component) {
             }, function () {
                 return _this3.triggerMoviesUpdate();
             });
-
-            console.log(mp);
         }
     }, {
         key: 'render',
@@ -19056,10 +19054,9 @@ var _axios2 = _interopRequireDefault(_axios);
 function _interopRequireDefault(obj) { return obj && obj.__esModule ? obj : { default: obj }; }
 
 var APIKEY = 'api_key=9624561704e52e84ae59cd0147eb662d'; /*eslint-env es_modules */
-var discoverMovies = exports.discoverMovies = function discoverMovies() {
-    var pg = arguments.length > 0 && arguments[0] !== undefined ? arguments[0] : 1;
-
-    return _axios2.default.get('https://api.themoviedb.org/3/discover/movie?' + APIKEY + '&language=en-US&page={pg}&sort_by=popularity.desc');
+var discoverMovies = exports.discoverMovies = function discoverMovies(pg) {
+    console.log(pg);
+    return _axios2.default.get('https://api.themoviedb.org/3/discover/movie?' + APIKEY + '&language=en-US&page=' + pg + '&sort_by=popularity.desc');
 };
 
 /***/ }),
