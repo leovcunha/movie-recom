@@ -34,15 +34,18 @@ public class Spectator {
     @ElementCollection private List<String> recommendations; //movie ids * Must be declared as interface
     private @JsonIgnore String password;
     
+    private String[] roles;
+    
     public void setPassword(String password) {
-    		this.password =PASSWORD_ENCODER.encode(password);
+    		this.password = PASSWORD_ENCODER.encode(password);
     }
     
 	private Spectator() {}
 
-	public Spectator(String userName, String password) {
+	public Spectator(String userName, String pword, String... roles) {
 		this.userName = userName;
-		this.setPassword(password);
+		this.setPassword(pword);
+		this.roles = roles;
 		this.movieRatings=  new HashMap<String, Integer>();
 		this.recommendations = new ArrayList<String>();
 	}
