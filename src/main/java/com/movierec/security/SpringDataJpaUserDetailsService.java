@@ -4,6 +4,7 @@
 package com.movierec.security;
 
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.security.core.authority.AuthorityUtils;
 import org.springframework.security.core.userdetails.User;
 import org.springframework.security.core.userdetails.UserDetails;
 import org.springframework.security.core.userdetails.UserDetailsService;
@@ -35,7 +36,7 @@ public class SpringDataJpaUserDetailsService implements UserDetailsService {
 	public UserDetails loadUserByUsername(String name) throws UsernameNotFoundException {
 		
 		Spectator spectator = this.repository.findByUserName(name);
-		return new User(spectator.getUserName(), spectator.getPassword(), null);
+		return new User(spectator.getUserName(), spectator.getPassword(), AuthorityUtils.createAuthorityList(spectator.getRoles()));
 	}
 
 }
