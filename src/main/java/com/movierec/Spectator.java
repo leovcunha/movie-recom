@@ -5,6 +5,7 @@ import java.util.HashMap;
 import java.util.Map;
 import java.util.List;
 
+import javax.persistence.Column;
 import javax.persistence.ElementCollection;
 import javax.persistence.Entity;
 import javax.persistence.GeneratedValue;
@@ -32,7 +33,7 @@ public class Spectator {
 	private @NotNull String userName;
 	@ElementCollection	private Map<String, Integer> movieRatings; // movie id-> rating 
     @ElementCollection private List<String> recommendations; //movie ids * Must be declared as interface
-    private @JsonIgnore String password;
+    private @JsonIgnore @Column(length = 60) String password;
     
     private String[] roles;
     
@@ -42,8 +43,8 @@ public class Spectator {
     
 	private Spectator() {}
 
-	public Spectator(String userName, String pword, String... roles) {
-		this.userName = userName;
+	public Spectator(String uName, String pword, String... roles) {
+		this.userName = uName;
 		this.setPassword(pword);
 		this.roles = roles;
 		this.movieRatings=  new HashMap<String, Integer>();
