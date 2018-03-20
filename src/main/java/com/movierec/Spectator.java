@@ -1,5 +1,6 @@
 package com.movierec;
 
+import java.io.Serializable;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.Map;
@@ -10,8 +11,6 @@ import javax.persistence.ElementCollection;
 import javax.persistence.Entity;
 import javax.persistence.GeneratedValue;
 import javax.persistence.Id;
-
-
 import javax.validation.constraints.NotNull;
 
 import org.springframework.security.crypto.bcrypt.BCryptPasswordEncoder;
@@ -25,27 +24,28 @@ import lombok.ToString;
 @Data
 @Entity
 @ToString(exclude = "password")
-public class Spectator {
+public class Spectator implements Serializable {
 	
 	public static final PasswordEncoder PASSWORD_ENCODER = new BCryptPasswordEncoder();
-
+    private static final long serialVersionUID = 1L;
 	private @Id @GeneratedValue Long id;
 	private @NotNull String userName;
 	@ElementCollection	private Map<String, Integer> movieRatings; // movie id-> rating 
     @ElementCollection private List<String> recommendations; //movie ids * Must be declared as interface
-    private @JsonIgnore @Column(length = 60) String password;
+    private @Column(length = 60) @NotNull String password;
     
     private String[] roles;
     
-    public void setPassword(String password) {
-    		this.password = PASSWORD_ENCODER.encode(password);
-    }
-    
 	private Spectator() {}
 
+    public void setPassword(String password) {
+        
+        this.password = PASSWORD_ENCODER.encode(password);
+        
+    }
 	public Spectator(String uName, String pword, String... roles) {
 		this.userName = uName;
-		this.setPassword(pword);
+        this.setPassword(pword);
 		this.roles = roles;
 		this.movieRatings=  new HashMap<String, Integer>();
 		this.recommendations = new ArrayList<String>();
