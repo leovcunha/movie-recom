@@ -16,12 +16,12 @@ Microservice-based
 ## Technologies
 
 **Frontend:** 
-React
+HTML/CSS/JS(ES6)
+React | Redux 
 Axios
 Webpack
-HTML/CSS
 
 **Backend:**
+Java 8
+Spring ( Boot | MVC | Data JPA | Data REST | Security ) 
 MovieDB API
-Java 
-Spring Boot
