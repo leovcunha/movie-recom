@@ -43,10 +43,11 @@ public class Spectator implements Serializable {
         this.password = PASSWORD_ENCODER.encode(password);
         
     }
-	public Spectator(String uName, String pword, String... roles) {
+	public Spectator(String uName, String pword) {
 		this.userName = uName;
         this.setPassword(pword);
-		this.roles = roles;
+		this.roles = new String[1];
+		this.roles[0] = "USER";
 		this.movieRatings=  new HashMap<String, Integer>();
 		this.recommendations = new ArrayList<String>();
 	}

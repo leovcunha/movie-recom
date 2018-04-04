@@ -5,6 +5,12 @@ import { discoverMovies } from './actions/discoverMovies';
 import Header from './components/Header';
 import MovieTable from './components/MovieTable';
 
+import { Provider } from 'react-redux';
+import { createStore, applyMiddleware } from 'redux';
+import reducers from './reducers';
+
+const createStoreWithMiddleware = applyMiddleware()(createStore);
+
 class App extends React.Component {
   constructor(props) {
     super(props);
@@ -64,6 +70,8 @@ render() {
 }
 
 ReactDOM.render(
-	<App />,
+    <Provider store={createStoreWithMiddleware(reducers)}>
+	   <App />
+	</Provider> ,
 	document.getElementById('react')
 )
