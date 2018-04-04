@@ -19957,7 +19957,7 @@ module.exports = function spread(callback) {
 
 
 Object.defineProperty(exports, "__esModule", {
-   value: true
+  value: true
 });
 exports.default = Header;
 
@@ -19968,38 +19968,20 @@ var _react2 = _interopRequireDefault(_react);
 function _interopRequireDefault(obj) { return obj && obj.__esModule ? obj : { default: obj }; }
 
 function Header() {
-   return _react2.default.createElement(
-      "div",
+  return _react2.default.createElement(
+    'div',
+    null,
+    _react2.default.createElement(
+      'header',
       null,
       _react2.default.createElement(
-         "header",
-         null,
-         _react2.default.createElement(
-            "h1",
-            null,
-            "Movie Recommendations"
-         ),
-         _react2.default.createElement(
-            "ul",
-            { id: "nav" },
-            _react2.default.createElement(
-               "li",
-               { className: "item1" },
-               "item 1"
-            ),
-            _react2.default.createElement(
-               "li",
-               { className: "item2" },
-               "item 2"
-            ),
-            _react2.default.createElement(
-               "li",
-               { className: "item3" },
-               "item 3"
-            )
-         )
-      )
-   );
+        'h1',
+        null,
+        'Movie Recommendations'
+      ),
+      _react2.default.createElement(LoginForm, null)
+    )
+  );
 }
 
 /***/ }),

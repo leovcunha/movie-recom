@@ -2,6 +2,7 @@ package com.movierec.security;
 
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.context.annotation.Configuration;
+import org.springframework.http.HttpMethod;
 import org.springframework.security.config.annotation.authentication.builders.AuthenticationManagerBuilder;
 import org.springframework.security.config.annotation.web.builders.HttpSecurity;
 import org.springframework.security.config.annotation.web.configuration.EnableWebSecurity;
@@ -21,17 +22,20 @@ public class WebSecurityConfig extends WebSecurityConfigurerAdapter {
         http
             .authorizeRequests()
                 .antMatchers("/", "/built/**", "/css/**").permitAll()
-               // .anyRequest().fullyAuthenticated()
+                .antMatchers(HttpMethod.POST, "/api/spectators").permitAll()
+                .antMatchers("/api/spectators/{^[\\d]$}").authenticated()
+                .antMatchers("/api/**").hasRole("ADMIN")
+                .anyRequest().fullyAuthenticated()
                 .and()
-            .formLogin()
-     
+            .formLogin()   
+                .loginPage("/login")
                 .defaultSuccessUrl("/", true)
                 .permitAll()
                 .and()
             .logout()
                 .permitAll()
-        			.and()
-        		.csrf().disable();       
+        		.and()
+        	.csrf().disable();       
     }
     
     @Autowired
