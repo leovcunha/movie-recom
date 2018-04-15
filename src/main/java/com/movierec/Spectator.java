@@ -29,13 +29,11 @@ public class Spectator implements Serializable {
 	public static final PasswordEncoder PASSWORD_ENCODER = new BCryptPasswordEncoder();
     private static final long serialVersionUID = 1L;
 	private @Id @GeneratedValue Long id;
-	private @NotNull String userName;
+	private @NotNull String username;
 	@ElementCollection	private Map<String, Integer> movieRatings; // movie id-> rating 
     @ElementCollection private List<String> recommendations; //movie ids * Must be declared as interface
     private @Column(length = 60) @NotNull String password;
-    
-    private String[] roles;
-    
+
 	private Spectator() {}
 
     public void setPassword(String password) {
@@ -43,11 +41,11 @@ public class Spectator implements Serializable {
         this.password = PASSWORD_ENCODER.encode(password);
         
     }
+    
 	public Spectator(String uName, String pword) {
-		this.userName = uName;
+		this.username = uName;
         this.setPassword(pword);
-		this.roles = new String[1];
-		this.roles[0] = "USER";
+
 		this.movieRatings=  new HashMap<String, Integer>();
 		this.recommendations = new ArrayList<String>();
 	}

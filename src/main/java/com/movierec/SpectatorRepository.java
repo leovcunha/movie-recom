@@ -1,9 +1,9 @@
 package com.movierec;
 
-import org.springframework.data.repository.CrudRepository;
+import org.springframework.data.jpa.repository.JpaRepository;
 
-public interface SpectatorRepository extends CrudRepository<Spectator, Long> {
+public interface SpectatorRepository extends JpaRepository<Spectator, Long> {
 	
-	Spectator findByUserName(String userName);
+	Spectator findByUsername(String username);
 
 }

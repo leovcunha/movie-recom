@@ -7,6 +7,7 @@ import org.springframework.security.config.annotation.authentication.builders.Au
 import org.springframework.security.config.annotation.web.builders.HttpSecurity;
 import org.springframework.security.config.annotation.web.configuration.EnableWebSecurity;
 import org.springframework.security.config.annotation.web.configuration.WebSecurityConfigurerAdapter;
+import org.springframework.security.config.http.SessionCreationPolicy;
 
 import com.movierec.Spectator;
 
@@ -21,20 +22,24 @@ public class WebSecurityConfig extends WebSecurityConfigurerAdapter {
     protected void configure(HttpSecurity http) throws Exception {
         http
             .authorizeRequests()
-                .antMatchers("/", "/built/**", "/css/**").permitAll()
+                .antMatchers("/", "/built/**", "/css/**", "/login").permitAll()
                 .antMatchers(HttpMethod.POST, "/api/spectators").permitAll()
                 .antMatchers("/api/spectators/{^[\\d]$}").authenticated()
                 .antMatchers("/api/**").hasRole("ADMIN")
                 .anyRequest().fullyAuthenticated()
                 .and()
-            .formLogin()   
+            .addFilter(new JWTAuthenticationFilter(authenticationManager()))
+            .addFilter(new JWTAuthorizationFilter(authenticationManager()))
+            .sessionManagement().sessionCreationPolicy(SessionCreationPolicy.STATELESS)
+                .and()
+ /*           .formLogin()   
                 .loginPage("/login")
                 .defaultSuccessUrl("/", true)
                 .permitAll()
                 .and()
             .logout()
                 .permitAll()
-        		.and()
+        		.and() */
         	.csrf().disable();       
     }
     
@@ -43,5 +48,5 @@ public class WebSecurityConfig extends WebSecurityConfigurerAdapter {
         auth.userDetailsService(this.userDetailsService)
         			.passwordEncoder(Spectator.PASSWORD_ENCODER);        
     }
-
+    
 }
