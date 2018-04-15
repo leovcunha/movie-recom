@@ -9,7 +9,9 @@ import org.springframework.security.core.userdetails.User;
 import org.springframework.security.core.userdetails.UserDetails;
 import org.springframework.security.core.userdetails.UserDetailsService;
 import org.springframework.security.core.userdetails.UsernameNotFoundException;
-import org.springframework.stereotype.Component;
+import org.springframework.stereotype.Service;
+
+import static java.util.Collections.emptyList;
 
 import com.movierec.Spectator;
 import com.movierec.SpectatorRepository;
@@ -18,7 +20,7 @@ import com.movierec.SpectatorRepository;
  * @author leovcunha
  *
  */
-@Component
+@Service
 public class SpringDataJpaUserDetailsService implements UserDetailsService {
 
 	/* (non-Javadoc)
@@ -35,8 +37,12 @@ public class SpringDataJpaUserDetailsService implements UserDetailsService {
 	@Override
 	public UserDetails loadUserByUsername(String name) throws UsernameNotFoundException {
 		
-		Spectator spectator = this.repository.findByUserName(name);
-		return new User(spectator.getUserName(), spectator.getPassword(), AuthorityUtils.createAuthorityList(spectator.getRoles()));
+		Spectator spectator = this.repository.findByUsername(name);
+
+        if (spectator == null)
+           throw new UsernameNotFoundException("User not found");
+    		
+    	return new User(spectator.getUsername(), spectator.getPassword(), emptyList());
 	}
 
 }
