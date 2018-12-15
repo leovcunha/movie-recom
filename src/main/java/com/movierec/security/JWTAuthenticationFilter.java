@@ -32,6 +32,10 @@ import static com.movierec.security.SecurityConstants.HEADER_STRING;
 import static com.movierec.security.SecurityConstants.SECRET;
 import static com.movierec.security.SecurityConstants.TOKEN_PREFIX;
 
+/**
+ * Adds an authentication filter that checks username and password and if correct sends back a JsonwebToken
+ * to be used with Authorization Filter
+ */
 public class JWTAuthenticationFilter extends UsernamePasswordAuthenticationFilter {
     private AuthenticationManager authenticationManager;
 
@@ -39,6 +43,9 @@ public class JWTAuthenticationFilter extends UsernamePasswordAuthenticationFilte
         this.authenticationManager = authenticationManager;
     }
 
+/**
+ * Checks username & password with authentication manager injected by WebSecurity 
+ */
     @Override
     public Authentication attemptAuthentication(HttpServletRequest req,
                                                 HttpServletResponse res) throws AuthenticationException {
@@ -49,8 +56,8 @@ public class JWTAuthenticationFilter extends UsernamePasswordAuthenticationFilte
 
             return authenticationManager.authenticate(
                     new UsernamePasswordAuthenticationToken(
-                            creds.get("username"),
-                            creds.get("password"),
+                            creds.get("username"), //if create spectator instance auth will fail because
+                            creds.get("password"), //of encoder is inside model. Could have changed if wanted this design.
                             new ArrayList<>())
                             
             );
@@ -58,7 +65,9 @@ public class JWTAuthenticationFilter extends UsernamePasswordAuthenticationFilte
             throw new RuntimeException(e);
         }
     }
-
+/**
+ * Create token and send to user in header with prefix
+ */
     @Override
     protected void successfulAuthentication(HttpServletRequest req,
                                             HttpServletResponse res,

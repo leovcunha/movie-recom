@@ -2,13 +2,9 @@ import React from 'react';
 import { connect } from 'react-redux';
 
 export class LoginForm extends React.Component {
-
-   constructor(props) {
-       super(props);
-   }
    
    render() {
-    if(props.isLoggedIn) {
+    if(this.props.isLoggedIn) {
         return (
         <div>
         <p className="login">Hello {this.props.username}!</p>
@@ -31,7 +27,7 @@ export class LoginForm extends React.Component {
          </div>
     );
    }
-    s
+    
 }
 
 function mapStateToProps(state) {
