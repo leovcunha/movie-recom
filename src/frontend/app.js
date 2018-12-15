@@ -8,8 +8,11 @@ import MovieTable from './components/MovieTable';
 import { Provider } from 'react-redux';
 import { createStore, applyMiddleware } from 'redux';
 import reducers from './reducers';
+import reduxThunk from 'redux-thunk';
 
-const createStoreWithMiddleware = applyMiddleware()(createStore);
+const composeEnhancers = window.__REDUX_DEVTOOLS_EXTENSION_COMPOSE__ || compose;
+const createStoreWithMiddleware = composeEnhancers(applyMiddleware(reduxThunk))(createStore);
+const store = createStoreWithMiddleware(reducers);
 
 class App extends React.Component {
   constructor(props) {
@@ -70,8 +73,8 @@ render() {
 }
 
 ReactDOM.render(
-    <Provider store={createStoreWithMiddleware(reducers)}>
+    <Provider store={store}>
 	   <App />
 	</Provider> ,
 	document.getElementById('react')
-)
+);
