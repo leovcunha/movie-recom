@@ -2,7 +2,7 @@
 node_modules
 jspm_packages
 node
-
+.idea
 **/target
 
 #Logs
