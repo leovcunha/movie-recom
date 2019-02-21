@@ -62,4 +62,9 @@ ul#nav>li {
 
 .arrow-left {
 	text-align: right;
+	cursor: pointer;
+}
+
+.arrow-right {
+    cursor: pointer;
 }
