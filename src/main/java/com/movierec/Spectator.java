@@ -18,6 +18,8 @@ import org.springframework.security.crypto.password.PasswordEncoder;
 
 import com.fasterxml.jackson.annotation.JsonIgnore;
 
+import com.movierec.recommender.MovieRecommender;
+
 import lombok.Data;
 import lombok.ToString;
 
@@ -31,7 +33,7 @@ public class Spectator implements Serializable {
 	private @Id @GeneratedValue Long id;
 	private @NotNull String username;
 	@ElementCollection	private Map<String, Integer> movieRatings; // movie id-> rating 
-    @ElementCollection private List<String> recommendations; //movie ids * Must be declared as interface
+    @ElementCollection private Map<Long, Float> recommendations; //movie ids * Must be declared as interface
     private @Column(length = 60) @NotNull String password;
 
 	private Spectator() {}
@@ -47,6 +49,6 @@ public class Spectator implements Serializable {
 			this.setPassword(pword);
 
 		this.movieRatings=  new HashMap<String, Integer>();
-		this.recommendations = new ArrayList<String>();
+		this.recommendations = new HashMap<Long, Float>();
 	}
 }
