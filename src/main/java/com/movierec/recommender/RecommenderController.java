@@ -40,7 +40,7 @@ public class RecommenderController {
         // do some intermediate processing, logging, etc. with the producers
         //
         Spectator spectator = this.repository.findById(id).get(); //Optional.get() -> return the value.
-        recommendations = movierecom.getRecommendations(id, 5);
+        recommendations = movierecom.getRecommendations(spectator.getMovieratings());
         spectator.setRecommendations(recommendations);
         repository.save(spectator);
         
