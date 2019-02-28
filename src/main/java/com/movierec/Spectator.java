@@ -32,7 +32,7 @@ public class Spectator implements Serializable {
     private static final long serialVersionUID = 1L;
 	private @Id @GeneratedValue Long id;
 	private @NotNull String username;
-	@ElementCollection	private Map<String, Integer> movieRatings; // movie id-> rating 
+	@ElementCollection	private Map<Long, Float> movieratings; // movie id-> rating 
     @ElementCollection private Map<Long, Float> recommendations; //movie ids * Must be declared as interface
     private @Column(length = 60) @NotNull String password;
 
@@ -48,7 +48,7 @@ public class Spectator implements Serializable {
 			this.username = uName;
 			this.setPassword(pword);
 
-		this.movieRatings=  new HashMap<String, Integer>();
+		this.movieratings=  new HashMap<Long, Float>();
 		this.recommendations = new HashMap<Long, Float>();
 	}
 }
