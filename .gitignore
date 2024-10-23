@@ -1,14 +1,26 @@
-#Dependency directories
+# This is a sample .gitignore file for Python projects
+
+# Byte-compiled / optimized / DLL files
+*.pyc
+*.pyo
+__pycache__
+
+# Distribution / build files
+*.egg-info/
+dist/
+build/
+
+# Notebook and other IPython-related files
+.ipynb_checkpoints/
+*.ipynb
+
+# Environments
+.env
+venv/
+virtualenvs/
+
+# Pytest cache
+.cache/
+
+.vscode/
 node_modules
-jspm_packages
-node
-.idea
-**/target
-
-#Logs
-*.log
-npm-debug.log*
-
-#others
-.codeenvy.json
-.DS_Store
