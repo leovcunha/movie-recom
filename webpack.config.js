@@ -1,48 +1,98 @@
 const path = require("path");
 const HtmlWebpackPlugin = require("html-webpack-plugin");
+const MiniCssExtractPlugin = require("mini-css-extract-plugin");
+const CssMinimizerPlugin = require("css-minimizer-webpack-plugin");
+const ReactRefreshWebpackPlugin = require("@pmmmwh/react-refresh-webpack-plugin");
+const TerserPlugin = require("terser-webpack-plugin");
 
-module.exports = {
-    entry: "./src/frontend/app.js",
+module.exports = (env, argv) => {
+    const isProduction = argv.mode === "production";
 
-    output: {
-        path: path.resolve(__dirname, "src/main/resources/static/"),
-        filename: "built/app-bundle.js",
-        publicPath: "/",
-    },
-
-    plugins: [
-        new HtmlWebpackPlugin({
-            hash: true,
-            template: "src/main/index.html",
-            filename: "index.html",
-        }),
-    ],
-
-    devServer: {
-        static: {
-            directory: path.join(__dirname, "src/main/resources/static/"),
+    return {
+        mode: isProduction ? "production" : "development",
+        entry: "./src/frontend/app.js",
+        output: {
+            path: path.resolve(__dirname, "src/main/resources/static/"),
+            filename: isProduction ? "built/[name].[contenthash].js" : "built/[name].bundle.js",
+            chunkFilename: isProduction
+                ? "built/[name].[contenthash].chunk.js"
+                : "built/[name].chunk.js",
+            clean: true,
         },
-        proxy: {
-            "/api/*": {
-                target: "http://localhost:8080",
-                secure: false,
-                publicPath: "/",
-            },
-        },
-    },
-    module: {
-        rules: [
-            {
-                test: /\.js$/,
-                exclude: /(node_modules|bower_components)/,
-                use: {
-                    loader: "babel-loader",
+        optimization: {
+            runtimeChunk: "single",
+            splitChunks: {
+                chunks: "all",
+                maxInitialRequests: Infinity,
+                minSize: 0,
+                cacheGroups: {
+                    vendor: {
+                        test: /[\\/]node_modules[\\/]/,
+                        name(module) {
+                            const packageName = module.context.match(
+                                /[\\/]node_modules[\\/](.*?)([\\/]|$)/
+                            )[1];
+                            return `vendor.${packageName.replace("@", "")}`;
+                        },
+                    },
                 },
             },
-            {
-                test: /\.css$/,
-                use: ["style-loader", "css-loader"],
+            minimize: isProduction,
+            minimizer: [new TerserPlugin(), new CssMinimizerPlugin()],
+        },
+        module: {
+            rules: [
+                {
+                    test: /\.(js|jsx)$/,
+                    exclude: /node_modules/,
+                    use: {
+                        loader: "babel-loader",
+                        options: {
+                            presets: ["@babel/preset-env", "@babel/preset-react"],
+                            plugins: [!isProduction && "react-refresh/babel"].filter(Boolean),
+                        },
+                    },
+                },
+                {
+                    test: /\.css$/,
+                    use: [
+                        isProduction ? MiniCssExtractPlugin.loader : "style-loader",
+                        {
+                            loader: "css-loader",
+                            options: {
+                                sourceMap: !isProduction,
+                            },
+                        },
+                    ],
+                },
+            ],
+        },
+        plugins: [
+            new HtmlWebpackPlugin({
+                template: "./src/main/index.html",
+                filename: "index.html",
+            }),
+            ...(!isProduction ? [new ReactRefreshWebpackPlugin()] : []),
+            isProduction &&
+                new MiniCssExtractPlugin({
+                    filename: "built/styles/[name].[contenthash].css",
+                }),
+        ].filter(Boolean),
+        resolve: {
+            extensions: [".js", ".jsx"],
+        },
+        devServer: {
+            static: {
+                directory: path.join(__dirname, "src/main/resources/static/"),
             },
-        ],
-    },
+            historyApiFallback: true,
+            hot: !isProduction,
+            proxy: {
+                "/api/*": {
+                    target: "http://localhost:8080",
+                    secure: false,
+                },
+            },
+        },
+    };
 };
