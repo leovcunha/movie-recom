@@ -1,80 +1,64 @@
-/*eslint-env es_modules */
-import React from 'react';
-import ReactDOM from 'react-dom';
-import { discoverMovies } from './actions/discoverMovies';
-import Header from './components/Header';
-import MovieTable from './components/MovieTable';
+import React, { useState, useEffect } from "react";
+import ReactDOM from "react-dom";
+import { discoverMovies } from "./actions/discoverMovies";
+import Header from "./components/Header";
+import MovieTable from "./components/MovieTable";
+import "./css/main.css";
 
-import { Provider } from 'react-redux';
-import { createStore, applyMiddleware } from 'redux';
-import reducers from './reducers';
-import reduxThunk from 'redux-thunk';
+const App = () => {
+    const [isLoading, setIsLoading] = useState(false);
+    const [moviePage, setMoviePage] = useState(1);
+    const [movieList, setMovieList] = useState({ results: [] });
+    const [error, setError] = useState(null);
 
-const composeEnhancers = window.__REDUX_DEVTOOLS_EXTENSION_COMPOSE__ || compose;
-const createStoreWithMiddleware = composeEnhancers(applyMiddleware(reduxThunk))(createStore);
-const store = createStoreWithMiddleware(reducers);
+    useEffect(() => {
+        triggerMoviesUpdate();
+    }, [moviePage]);
 
-class App extends React.Component {
-  constructor(props) {
-    super(props);
-    
-    this.pageHandler = this.pageHandler.bind(this);
-    
-    this.state = {
-        isLoading: false,
-        moviePage: 1,
-        movieList: {
-            results: []
+    const triggerMoviesUpdate = async () => {
+        try {
+            setIsLoading(true);
+            const res = await discoverMovies(moviePage.toString());
+            setMovieList(res.data);
+        } catch (err) {
+            setError("Failed to fetch movies");
+            console.error("Error:", err);
+        } finally {
+            setIsLoading(false);
         }
-
     };
-  }
-componentDidMount() {
-    this.triggerMoviesUpdate();
-}
 
-triggerMoviesUpdate() {
-    this.setState({isLoading: true});
-    discoverMovies(this.state.moviePage.toString()).then(res => {
-        const movieList = res.data;
-        return this.setState({ movieList, isLoading: false });
-    });   
-}
+    const pageHandler = (increment) => {
+        console.log("App pageHandler called with increment:", increment);
+        console.log("Current page before update:", moviePage);
 
-pageHandler(increm) {
-    let mp = this.state.moviePage;
-    if (increm) {
-        mp =  mp + 1;
-    } 
-    else if (!increm && mp > 1) {
-        mp = mp - 1;
-    }
-
-    this.setState({
-        moviePage: mp
-    }, () => this.triggerMoviesUpdate()); 
-       
-}
-
-render() {
+        setMoviePage((prev) => {
+            const newPage = increment ? prev + 1 : Math.max(1, prev - 1);
+            console.log("New page will be:", newPage);
+            return newPage;
+        });
+    };
 
     return (
-      <div>
-        <Header />
-        {this.state.isLoading? ( //if (isLoading)
-             <p>Loading...</p>
-             ) : (    //else
-             <MovieTable movies={this.state.movieList.results} pagehandler={this.pageHandler}/>
-             )
-         }
-      </div>
+        <div className="app-container">
+            <Header />
+            {error && <div className="error">{error}</div>}
+            {isLoading ? (
+                <div>Loading...</div>
+            ) : (
+                <MovieTable
+                    movies={movieList.results}
+                    pagehandler={(increment) => {
+                        console.log("MovieTable triggered pageHandler with:", increment);
+                        pageHandler(increment);
+                    }}
+                    currentPage={moviePage}
+                />
+            )}
+        </div>
     );
-  }
-}
+};
 
-ReactDOM.render(
-    <Provider store={store}>
-	   <App />
-	</Provider> ,
-	document.getElementById('react')
-);
+ReactDOM.render(<App />, document.getElementById("react"));
+
+export default App;
