@@ -1,15 +1,11 @@
-import React from 'react';
-import LoginForm from './LoginForm'
+import React from "react";
 
 export default function Header() {
     return (
-      <div>
-        <header>
-           <h1>Movie Recommendations</h1>
-           <LoginForm />
-        </header>  
-      </div>
+        <div>
+            <header>
+                <h1>Movie Recommendations</h1>
+            </header>
+        </div>
     );
-    
 }
-
