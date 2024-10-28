@@ -1,29 +1,27 @@
-# Movie Recommendation System 
+# Movie Recommendation Project
 
-Implementation of a netflix-like recommendation system 
+This is a movie recommendation project built using Python for the backend and React for the frontend.
 
-## 'User' Requirements
-* Based on previous info the system will recommend to user some movies to watch 
-* enter the site and login with email
-* see a table of popular movies and rank at least 10 movies he watched 
-* after saving , system will calculate recommendations based on user prefs and show him 
+## Backend
 
+The backend is written in Python and uses a collaborative filtering. The main file is located at `src/backend/python/app.py`.
 
-## Design / architecture decisions
+## Frontend
 
-Microservice-based
+The frontend is built with React and can be found in the `src/frontend` directory.
 
-## Technologies
+## Getting Started
 
-**Frontend:** 
+1. **Backend**
 
-HTML/CSS/JS(ES6)  
-React | Redux  
-Axios  
-Webpack | Babel
+    - Install dependencies: `pip install -r requirements.txt`
+    - Run the server: `python src/main/python/app.py`
 
-**Backend:**
+2. **Frontend**
+    - Install dependencies: `npm install`
+    - Build the project: `npm run build`
+    - Start the development server: `npm start`
 
-Java 8  
-Spring ( Boot | MVC | Data JPA | Data REST | Security )  
-MovieDB API
+## Contributing
+
+Contributions are welcome! Please open an issue to discuss any changes or improvements.

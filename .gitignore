@@ -24,3 +24,6 @@ virtualenvs/
 
 .vscode/
 node_modules
+# Resources folder but keep main contents
+src/main/resources/
+!src/main/*
