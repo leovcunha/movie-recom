@@ -1,0 +1,130 @@
+body {
+    background-color: rgb(44, 44, 44);
+    font-family: Arial, Helvetica, Sans-Serif;
+    color: rgb(230, 230, 230);
+}
+
+header {
+    position: relative;
+    display: flex;
+    align-items: center;
+    flex-wrap: wrap;
+    margin: auto;
+    width: 100%;
+    max-width: 1400px;
+}
+
+ul#nav {
+    list-style: none;
+    text-align: center;
+    position: absolute;
+    right: 0;
+    top: 20%;
+}
+
+header h1 {
+    float: left;
+    text-align: center;
+}
+
+ul#nav > li {
+    display: inline;
+    padding: 10px;
+}
+
+.mov-img {
+    width: 100%;
+    height: auto;
+    padding: 0;
+}
+
+.movielist {
+    display: grid;
+    grid-template-columns: repeat(5, minmax(200px, 1fr));
+    gap: 5px;
+    padding: 10px;
+    max-width: 1400px;
+    margin: 0 auto;
+}
+
+.movie-holder {
+    width: 100%;
+}
+
+.movietable {
+    position: relative;
+    display: flex; /* Change from grid to flex */
+    align-items: center; /* Center items vertically */
+    justify-content: space-between; /* Space out the chevrons and movie list */
+    margin: auto;
+    width: 100%;
+    max-width: 1400px;
+}
+
+.arrow-left {
+    text-align: right;
+    cursor: pointer;
+}
+
+.arrow-right {
+    cursor: pointer;
+}
+
+.arrow-left,
+.arrow-right {
+    font-size: 2rem; /* Ensure the chevrons are large enough */
+    color: rgb(230, 230, 230); /* Match the text color */
+    user-select: none; /* Prevent text selection */
+    z-index: 1000; /* Add this to ensure chevrons are on top */
+    position: relative; /* Add this to make z-index work */
+}
+
+.arrow-left {
+    margin-right: 10px; /* Add some space between the chevron and the movie list */
+}
+
+.arrow-right {
+    margin-left: 10px; /* Add some space between the chevron and the movie list */
+}
+
+.debug-button {
+    border: none;
+    cursor: pointer;
+    color: rgb(230, 230, 230);
+    background: transparent;
+    z-index: 1000;
+    position: relative;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    min-width: 48px; /* minimum touch target size */
+    min-height: 48px; /* minimum touch target size */
+}
+
+.material-icons {
+    font-size: 2rem;
+    pointer-events: none; /* prevent icon from interfering with clicks */
+}
+
+@media screen and (max-width: 768px) {
+    .movielist {
+        grid-template-columns: repeat(3, 1fr);
+        gap: 5px;
+        padding: 5px;
+    }
+
+    .movie-holder {
+        width: 100%;
+    }
+
+    .mov-img {
+        width: 100%;
+        height: auto;
+    }
+}
+
+@media screen and (max-width: 480px) {
+    .movielist {
+        grid-template-columns: repeat(2, 1fr);
+    }
+}

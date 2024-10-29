@@ -3,7 +3,7 @@ import ReactDOM from "react-dom";
 import { discoverMovies } from "./actions/discoverMovies";
 import Header from "./components/Header";
 import MovieTable from "./components/MovieTable";
-import "./css/main.css";
+import "../main/main.css";
 
 const App = () => {
     const [isLoading, setIsLoading] = useState(false);
