@@ -1,9 +1,9 @@
-import React, { useState, useEffect } from "react";
-import ReactDOM from "react-dom";
-import { discoverMovies } from "./actions/discoverMovies";
-import Header from "./components/Header";
-import MovieTable from "./components/MovieTable";
-import "../main/main.css";
+import React, { useState, useEffect } from 'react';
+import { createRoot } from 'react-dom/client';
+import { discoverMovies } from './actions/discoverMovies';
+import Header from './components/Header';
+import MovieTable from './components/MovieTable';
+import '../main/main.css';
 
 const App = () => {
     const [isLoading, setIsLoading] = useState(false);
@@ -21,20 +21,16 @@ const App = () => {
             const res = await discoverMovies(moviePage.toString());
             setMovieList(res.data);
         } catch (err) {
-            setError("Failed to fetch movies");
-            console.error("Error:", err);
+            setError('Failed to fetch movies');
+            console.error('Error:', err);
         } finally {
             setIsLoading(false);
         }
     };
 
     const pageHandler = (increment) => {
-        console.log("App pageHandler called with increment:", increment);
-        console.log("Current page before update:", moviePage);
-
         setMoviePage((prev) => {
             const newPage = increment ? prev + 1 : Math.max(1, prev - 1);
-            console.log("New page will be:", newPage);
             return newPage;
         });
     };
@@ -49,7 +45,6 @@ const App = () => {
                 <MovieTable
                     movies={movieList.results}
                     pagehandler={(increment) => {
-                        console.log("MovieTable triggered pageHandler with:", increment);
                         pageHandler(increment);
                     }}
                     currentPage={moviePage}
@@ -59,6 +54,8 @@ const App = () => {
     );
 };
 
-ReactDOM.render(<App />, document.getElementById("react"));
+const container = document.getElementById('react');
+const root = createRoot(container);
+root.render(<App />);
 
 export default App;
