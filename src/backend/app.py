@@ -1,7 +1,8 @@
 from fastapi import FastAPI, HTTPException
+from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
 from typing import Dict
-from .recommendation_service import MovieRecommender
+from recommendation_service import MovieRecommender  # Changed to absolute import
 import os
 import logging
 
@@ -11,9 +12,22 @@ logger = logging.getLogger(__name__)
 
 app = FastAPI()
 
+# Add CORS middleware
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=["http://localhost:8080"],
+    allow_credentials=True,
+    allow_methods=["*"],
+    allow_headers=["*"],
+)
+
+# Update path to be relative to this file
+current_dir = os.path.dirname(os.path.abspath(__file__))
+data_path = os.path.join(current_dir, "data", "ratings_small.csv")
+
 # Initialize recommender once when starting the server
 try:
-    recommender = MovieRecommender("data/ratings_small.csv")
+    recommender = MovieRecommender(data_path)
 except Exception as e:
     logger.error(f"Failed to initialize recommender: {e}")
     raise
