@@ -101,6 +101,29 @@ class MovieRecommender:
         # Calculate cosine similarity between all users
         self.user_similarity = cosine_similarity(user_matrix_normalized)
 
+    def get_popular_movies(self, n: int = 20) -> Dict[int, int]:
+        """
+        Get the most viewed movies.
+
+        Args:
+            n (int): Number of popular movies to return
+
+        Returns:
+            Dict[int, int]: Dictionary of {movie_id: view_count}
+        """
+        # Count views per movie
+        movie_views = self.ratings_df["movieId"].value_counts()
+
+        # Get top N movies
+        top_movies = movie_views.head(n)
+
+        # Convert to dictionary with original movie IDs
+        popular_movies = {
+            int(movie_id): int(count) for movie_id, count in top_movies.items()
+        }
+
+        return popular_movies
+
     def get_recommendations(
         self, user_preferences: Dict[int, float], n_recommendations: int = 10
     ) -> Dict[str, float]:
