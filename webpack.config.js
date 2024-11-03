@@ -1,4 +1,5 @@
 const path = require('path');
+const webpack = require('webpack');
 const HtmlWebpackPlugin = require('html-webpack-plugin');
 const MiniCssExtractPlugin = require('mini-css-extract-plugin');
 const CssMinimizerPlugin = require('css-minimizer-webpack-plugin');
@@ -68,6 +69,11 @@ module.exports = (env, argv) => {
             ],
         },
         plugins: [
+            new webpack.DefinePlugin({
+                'process.env.BACKEND_URL': JSON.stringify(
+                    process.env.BACKEND_URL || 'http://localhost:8000'
+                ),
+            }),
             new HtmlWebpackPlugin({
                 template: './src/main/index.html',
                 filename: 'index.html',
@@ -80,6 +86,9 @@ module.exports = (env, argv) => {
         ].filter(Boolean),
         resolve: {
             extensions: ['.js', '.jsx'],
+            fallback: {
+                path: require.resolve('path-browserify'),
+            },
         },
         devServer: {
             static: {
@@ -89,7 +98,7 @@ module.exports = (env, argv) => {
             hot: !isProduction,
             proxy: {
                 '/api/*': {
-                    target: 'http://localhost:8080',
+                    target: 'http://localhost:8000',
                     secure: false,
                 },
             },
