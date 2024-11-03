@@ -5,12 +5,18 @@ from typing import Dict
 from recommendation_service import MovieRecommender  # Changed to absolute import
 import os
 import logging
+import requests
+from dotenv import load_dotenv
+
+# Load environment variables from .env file
+load_dotenv()
 
 # Configure logging
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
 app = FastAPI()
+TMDB_API_KEY = os.getenv("TMDB_API_KEY")
 
 # Add CORS middleware
 app.add_middleware(
@@ -74,6 +80,41 @@ async def get_valid_movies():
         }
     except Exception as e:
         logger.error(f"Error getting valid movies: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@app.get("/api/movies/discover")
+async def discover_movies(page: int = 1):
+    try:
+        response = requests.get(
+            "https://api.themoviedb.org/3/discover/movie",
+            params={
+                "api_key": TMDB_API_KEY,
+                "language": "en-US",
+                "page": page,
+                "sort_by": "popularity.desc",
+            },
+        )
+        if response.ok:
+            return response.json()
+        raise HTTPException(status_code=response.status_code)
+    except Exception as e:
+        logger.error(f"Error: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@app.get("/api/movies/{movie_id}")
+async def get_movie_details(movie_id: str):
+    try:
+        response = requests.get(
+            f"https://api.themoviedb.org/3/movie/{movie_id}",
+            params={"api_key": TMDB_API_KEY, "language": "en-US"},
+        )
+        if response.ok:
+            return response.json()
+        raise HTTPException(status_code=response.status_code)
+    except Exception as e:
+        logger.error(f"Error: {e}")
         raise HTTPException(status_code=500, detail=str(e))
 
 

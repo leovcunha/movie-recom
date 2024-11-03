@@ -1,10 +1,10 @@
 /*eslint-env es_modules */
 import axios from 'axios';
 
-const APIKEY = 'api_key=9624561704e52e84ae59cd0147eb662d';
+const BACKEND_URL = process.env.BACKEND_URL || 'http://localhost:8000';
 
-export const discoverMovies = function (pg) {
-    return axios.get(
-        `https://api.themoviedb.org/3/discover/movie?${APIKEY}&language=en-US&page=${pg}&sort_by=popularity.desc`
-    );
+export const discoverMovies = function (page) {
+    return axios.get(`${BACKEND_URL}/api/movies/discover`, {
+        params: { page },
+    });
 };
