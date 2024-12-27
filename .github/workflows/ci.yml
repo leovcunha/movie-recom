@@ -7,25 +7,27 @@ on:
     branches: [ main ]
 
 jobs:
-  build-and-test:
+  test:
     runs-on: ubuntu-latest
-    
-    env:
-      NODE_ENV: production
-      ENV: production
-    
+
     steps:
-    - uses: actions/checkout@v3
+    - uses: actions/checkout@v2
 
-    - name: Set up Node.js
-      uses: actions/setup-node@v3
+    - name: Set up Python
+      uses: actions/setup-python@v2
       with:
-        node-version: '20.x'
+        python-version: '3.9'
 
-    - name: Set up Docker Buildx
-      uses: docker/setup-buildx-action@v2
-
-    - name: Build and test
+    - name: Install dependencies
       run: |
-        docker build -t movie-recom .
-        docker run --rm -e ENV=production movie-recom python -m pytest 
+        python -m pip install --upgrade pip
+        pip install -r requirements.txt
+        pip install pytest pytest-cov fastapi httpx
+
+    - name: Run tests
+      env:
+        TMDB_API_KEY: ${{ secrets.TMDB_API_KEY }}
+        PYTHONPATH: ${{ github.workspace }}/src/backend
+      run: |
+        cd src/backend
+        pytest tests/ -v --cov=. 
