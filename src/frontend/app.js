@@ -20,14 +20,35 @@ const GENRES = [
 
 const App = () => {
     const [isLoading, setIsLoading] = useState(false);
-    const [popularMovies, setPopularMovies] = useState({ results: [] });
-    const [discoverMoviesList, setDiscoverMoviesList] = useState({ results: [] });
+    const [popularMovies, setPopularMovies] = useState({ results: [], page: 1 });
+    const [discoverMoviesList, setDiscoverMoviesList] = useState({ results: [], page: 1 });
     const [genreMovies, setGenreMovies] = useState({});
     const [error, setError] = useState(null);
 
     useEffect(() => {
         fetchAllMovies();
     }, []);
+
+    const loadMoreGenreMovies = async (genreId) => {
+        try {
+            const currentPage = genreMovies[genreId]?.page || 1;
+            const nextPage = currentPage + 1;
+            
+            const response = await fetchGenreMovies(genreId, nextPage);
+            
+            setGenreMovies(prev => ({
+                ...prev,
+                [genreId]: {
+                    ...response.data,
+                    results: [...prev[genreId].results, ...response.data.results],
+                    page: nextPage,
+                    total_pages: response.data.total_pages
+                }
+            }));
+        } catch (err) {
+            console.error('Error loading more movies:', err);
+        }
+    };
 
     const fetchAllMovies = async () => {
         try {
@@ -72,6 +93,8 @@ const App = () => {
                             <MovieCarousel
                                 movies={popularMovies.results}
                                 title="Most Viewed Movies"
+                                currentPage={popularMovies.page}
+                                totalPages={popularMovies.total_pages}
                             />
                         )}
 
@@ -79,6 +102,8 @@ const App = () => {
                             <MovieCarousel
                                 movies={discoverMoviesList.results}
                                 title="Popular Movies"
+                                currentPage={discoverMoviesList.page}
+                                totalPages={discoverMoviesList.total_pages}
                             />
                         )}
 
@@ -88,6 +113,9 @@ const App = () => {
                                     key={genre.id}
                                     movies={genreMovies[genre.id].results}
                                     title={`${genre.name} Movies`}
+                                    onLoadMore={() => loadMoreGenreMovies(genre.id)}
+                                    currentPage={genreMovies[genre.id]?.page || 1}
+                                    totalPages={genreMovies[genre.id]?.total_pages || 1}
                                 />
                             )
                         ))}

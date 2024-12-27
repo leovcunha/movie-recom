@@ -6,13 +6,8 @@ export const fetchPopularMovies = async () => {
     try {
         const backendResponse = await axios.get(`${BACKEND_URL}/valid-movies`);
         const popularMovies = backendResponse.data.popular_movies;
+        const movieDetails = backendResponse.data.movie_details;
 
-        const moviePromises = Object.keys(popularMovies).map(async (movieId) => {
-            const response = await axios.get(`${BACKEND_URL}/api/movies/${movieId}`);
-            return response.data;
-        });
-
-        const movieDetails = await Promise.all(moviePromises);
         return {
             data: {
                 results: movieDetails,
