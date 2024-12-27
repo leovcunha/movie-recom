@@ -156,7 +156,7 @@ async def get_genres():
 
 
 @app.get("/api/movies/genre/{genre_id}")
-async def get_movies_by_genre(genre_id: int):
+async def get_movies_by_genre(genre_id: int, page: int = 1):
     try:
         response = requests.get(
             "https://api.themoviedb.org/3/discover/movie",
@@ -167,7 +167,8 @@ async def get_movies_by_genre(genre_id: int):
                 "sort_by": "popularity.desc",
                 "include_adult": False,
                 "include_video": False,
-                "page": 1
+                "page": page,
+                "vote_count.gte": 100  # Only include movies with at least 100 votes
             }
         )
         if response.ok:

@@ -1,10 +1,12 @@
 import React, { useState, useEffect } from 'react';
 import { createRoot } from 'react-dom/client';
+import { Container } from 'react-bootstrap';
 import { discoverMovies } from './actions/discoverMovies';
 import { fetchPopularMovies } from './actions/fetchPopularMovies';
 import { fetchGenreMovies } from './actions/fetchGenreMovies';
 import Header from './components/Header';
-import MovieTable from './components/MovieTable';
+import MovieCarousel from './components/MovieCarousel';
+import 'bootstrap/dist/css/bootstrap.min.css';
 import '../main/main.css';
 
 const GENRES = [
@@ -54,47 +56,42 @@ const App = () => {
     return (
         <div className="app-container">
             <Header />
-            {error && <div className="error">{error}</div>}
-            {isLoading ? (
-                <div>Loading...</div>
-            ) : (
-                <>
-                    {popularMovies.results.length > 0 && (
-                        <div className="movie-section">
-                            <h2>Most Viewed Movies</h2>
-                            <MovieTable
+            <Container fluid>
+                {error && <div className="error alert alert-danger">{error}</div>}
+                {isLoading ? (
+                    <div className="text-center my-5">
+                        <div className="spinner-border" role="status">
+                            <span className="visually-hidden">Loading...</span>
+                        </div>
+                    </div>
+                ) : (
+                    <>
+                        {popularMovies.results.length > 0 && (
+                            <MovieCarousel
                                 movies={popularMovies.results}
-                                pagehandler={() => {}}
-                                currentPage={1}
+                                title="Most Viewed Movies"
                             />
-                        </div>
-                    )}
+                        )}
 
-                    {discoverMoviesList.results.length > 0 && (
-                        <div className="movie-section">
-                            <h2>Popular Movies</h2>
-                            <MovieTable
+                        {discoverMoviesList.results.length > 0 && (
+                            <MovieCarousel
                                 movies={discoverMoviesList.results}
-                                pagehandler={() => {}}
-                                currentPage={1}
+                                title="Popular Movies"
                             />
-                        </div>
-                    )}
+                        )}
 
-                    {GENRES.map(genre => (
-                        genreMovies[genre.id]?.results.length > 0 && (
-                            <div key={genre.id} className="movie-section">
-                                <h2>Popular {genre.name} Movies</h2>
-                                <MovieTable
+                        {GENRES.map(genre => (
+                            genreMovies[genre.id]?.results.length > 0 && (
+                                <MovieCarousel
+                                    key={genre.id}
                                     movies={genreMovies[genre.id].results}
-                                    pagehandler={() => {}}
-                                    currentPage={1}
+                                    title={`Popular ${genre.name} Movies`}
                                 />
-                            </div>
-                        )
-                    ))}
-                </>
-            )}
+                            )
+                        ))}
+                    </>
+                )}
+            </Container>
         </div>
     );
 };
