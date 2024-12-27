@@ -10,6 +10,10 @@ jobs:
   build-and-test:
     runs-on: ubuntu-latest
     
+    env:
+      NODE_ENV: production
+      ENV: production
+    
     steps:
     - uses: actions/checkout@v3
 
@@ -24,4 +28,4 @@ jobs:
     - name: Build and test
       run: |
         docker build -t movie-recom .
-        docker run --rm movie-recom python -m pytest 
+        docker run --rm -e ENV=production movie-recom python -m pytest 

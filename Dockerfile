@@ -4,6 +4,8 @@ WORKDIR /app
 COPY package*.json ./
 RUN npm install
 COPY . .
+# Build frontend in production mode
+ENV NODE_ENV=production
 RUN npm run build
 RUN echo "Contents of build:" && ls -la src/main/resources/static/
 
@@ -24,6 +26,7 @@ RUN pip install --no-cache-dir -r requirements.txt
 
 # Create static directory and copy the built frontend
 WORKDIR /app
+RUN mkdir -p /app/static/built
 # Copy the frontend build
 COPY --from=frontend-builder /app/src/main/resources/static/built /app/static/built
 COPY --from=frontend-builder /app/src/main/resources/static/index.html /app/static/index.html
@@ -35,6 +38,7 @@ COPY src/backend ./
 # Set environment variables
 ENV PYTHONPATH=/app
 ENV PORT=8000
+ENV ENV=production
 
 # Expose the port
 EXPOSE 8000
