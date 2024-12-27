@@ -9,6 +9,7 @@ import os
 import logging
 import requests
 from dotenv import load_dotenv
+from datetime import datetime, timedelta
 
 # Load environment variables from .env file
 load_dotenv()
@@ -19,6 +20,7 @@ logger = logging.getLogger(__name__)
 
 app = FastAPI()
 TMDB_API_KEY = os.getenv("TMDB_API_KEY")
+ENV = os.getenv("ENV", "development")  # Default to development if not set
 
 # Add CORS middleware
 app.add_middleware(
@@ -29,25 +31,30 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-# Debug: Print current directory and contents
-logger.debug(f"Current working directory: {os.getcwd()}")
-logger.debug(f"Directory contents: {os.listdir('.')}")
-logger.debug(f"Static directory contents: {os.listdir('static') if os.path.exists('static') else 'static directory not found'}")
+# Mount static files only in production
+if ENV == "production":
+    # Debug: Print current directory and contents
+    logger.debug(f"Current working directory: {os.getcwd()}")
+    logger.debug(f"Directory contents: {os.listdir('.')}")
+    logger.debug(f"Static directory contents: {os.listdir('static') if os.path.exists('static') else 'static directory not found'}")
 
-# Mount static files
-app.mount("/built", StaticFiles(directory="static/built"), name="built")
-app.mount("/static", StaticFiles(directory="static"), name="static")
+    # Mount static files
+    app.mount("/built", StaticFiles(directory="static/built"), name="built")
+    app.mount("/static", StaticFiles(directory="static"), name="static")
 
 @app.get("/")
 async def read_root():
     try:
-        logger.debug("Attempting to serve index.html")
-        if os.path.exists('static/index.html'):
-            logger.debug("Found static/index.html")
-            return FileResponse('static/index.html')
+        if ENV == "production":
+            logger.debug("Attempting to serve index.html")
+            if os.path.exists('static/index.html'):
+                logger.debug("Found static/index.html")
+                return FileResponse('static/index.html')
+            else:
+                logger.error("static/index.html not found")
+                return {"error": "Frontend not found"}
         else:
-            logger.error("static/index.html not found")
-            return {"error": "Frontend not found"}
+            return {"message": "API running in development mode"}
     except Exception as e:
         logger.error(f"Error serving index.html: {e}")
         raise HTTPException(status_code=500, detail=str(e))
@@ -118,11 +125,54 @@ async def discover_movies(page: int = 1):
                 "language": "en-US",
                 "page": page,
                 "sort_by": "popularity.desc",
-            },
+                "include_adult": False,
+                "include_video": False
+            }
         )
         if response.ok:
             return response.json()
-        raise HTTPException(status_code=response.status_code)
+        raise HTTPException(status_code=response.status_code, detail=f"{response.status_code}: {response.reason}")
+    except Exception as e:
+        logger.error(f"Error: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@app.get("/api/movies/genres")
+async def get_genres():
+    try:
+        response = requests.get(
+            "https://api.themoviedb.org/3/genre/movie/list",
+            params={
+                "api_key": TMDB_API_KEY,
+                "language": "en-US"
+            }
+        )
+        if response.ok:
+            return response.json()
+        raise HTTPException(status_code=response.status_code, detail=f"{response.status_code}: {response.reason}")
+    except Exception as e:
+        logger.error(f"Error: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@app.get("/api/movies/genre/{genre_id}")
+async def get_movies_by_genre(genre_id: int):
+    try:
+        response = requests.get(
+            "https://api.themoviedb.org/3/discover/movie",
+            params={
+                "api_key": TMDB_API_KEY,
+                "language": "en-US",
+                "with_genres": genre_id,
+                "sort_by": "popularity.desc",
+                "include_adult": False,
+                "include_video": False,
+                "page": 1
+            }
+        )
+        if response.ok:
+            return response.json()
+        raise HTTPException(status_code=response.status_code, detail=f"{response.status_code}: {response.reason}")
     except Exception as e:
         logger.error(f"Error: {e}")
         raise HTTPException(status_code=500, detail=str(e))
@@ -133,11 +183,14 @@ async def get_movie_details(movie_id: str):
     try:
         response = requests.get(
             f"https://api.themoviedb.org/3/movie/{movie_id}",
-            params={"api_key": TMDB_API_KEY, "language": "en-US"},
+            params={
+                "api_key": TMDB_API_KEY,
+                "language": "en-US"
+            }
         )
         if response.ok:
             return response.json()
-        raise HTTPException(status_code=response.status_code)
+        raise HTTPException(status_code=response.status_code, detail=f"{response.status_code}: {response.reason}")
     except Exception as e:
         logger.error(f"Error: {e}")
         raise HTTPException(status_code=500, detail=str(e))
