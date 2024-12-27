@@ -1,5 +1,7 @@
 from fastapi import FastAPI, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.staticfiles import StaticFiles
+from fastapi.responses import FileResponse
 from pydantic import BaseModel
 from typing import Dict
 from recommendation_service import MovieRecommender  # Changed to absolute import
@@ -12,7 +14,7 @@ from dotenv import load_dotenv
 load_dotenv()
 
 # Configure logging
-logging.basicConfig(level=logging.INFO)
+logging.basicConfig(level=logging.DEBUG)
 logger = logging.getLogger(__name__)
 
 app = FastAPI()
@@ -21,11 +23,33 @@ TMDB_API_KEY = os.getenv("TMDB_API_KEY")
 # Add CORS middleware
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["http://localhost:8080"],
+    allow_origins=["*"],
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
 )
+
+# Debug: Print current directory and contents
+logger.debug(f"Current working directory: {os.getcwd()}")
+logger.debug(f"Directory contents: {os.listdir('.')}")
+logger.debug(f"Static directory contents: {os.listdir('static') if os.path.exists('static') else 'static directory not found'}")
+
+# Mount static files
+app.mount("/static", StaticFiles(directory="static"), name="static")
+
+@app.get("/")
+async def read_root():
+    try:
+        logger.debug("Attempting to serve index.html")
+        if os.path.exists('static/index.html'):
+            logger.debug("Found static/index.html")
+            return FileResponse('static/index.html')
+        else:
+            logger.error("static/index.html not found")
+            return {"error": "Frontend not found"}
+    except Exception as e:
+        logger.error(f"Error serving index.html: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
 
 # Update path to be relative to this file
 current_dir = os.path.dirname(os.path.abspath(__file__))
