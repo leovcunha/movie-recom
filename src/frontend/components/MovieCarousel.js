@@ -25,9 +25,6 @@ const MovieCarousel = ({ movies, title }) => {
                                         />
                                         <Card.Body>
                                             <Card.Title>{movie.title}</Card.Title>
-                                            <Card.Text>
-                                                Rating: {movie.vote_average}/10
-                                            </Card.Text>
                                         </Card.Body>
                                     </Card>
                                 </Col>
