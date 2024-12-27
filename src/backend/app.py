@@ -35,6 +35,7 @@ logger.debug(f"Directory contents: {os.listdir('.')}")
 logger.debug(f"Static directory contents: {os.listdir('static') if os.path.exists('static') else 'static directory not found'}")
 
 # Mount static files
+app.mount("/built", StaticFiles(directory="static/built"), name="built")
 app.mount("/static", StaticFiles(directory="static"), name="static")
 
 @app.get("/")
