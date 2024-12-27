@@ -47,12 +47,7 @@ async def read_root():
     try:
         if ENV == "production":
             logger.debug("Attempting to serve index.html")
-            if os.path.exists('static/index.html'):
-                logger.debug("Found static/index.html")
-                return FileResponse('static/index.html')
-            else:
-                logger.error("static/index.html not found")
-                return {"error": "Frontend not found"}
+            return FileResponse('static/index.html')
         else:
             return {"message": "API running in development mode"}
     except Exception as e:
