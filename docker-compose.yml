@@ -1,0 +1,17 @@
+version: '3.8'
+
+services:
+  app:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    ports:
+      - "8000:8000"
+    volumes:
+      - ./src:/app/src
+      - ./static:/app/static
+    environment:
+      - PYTHONPATH=/app
+      - PORT=8000
+      - ENVIRONMENT=development
+    command: uvicorn app:app --host 0.0.0.0 --port 8000 --reload 
