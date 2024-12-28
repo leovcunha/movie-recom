@@ -1,0 +1,10 @@
+.stars-container {
+  display: flex;
+  align-items: center;
+  gap: 2px;
+}
+
+.star {
+  cursor: pointer;
+  transition: color 0.2s ease-in-out;
+} 

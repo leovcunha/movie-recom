@@ -1,7 +1,9 @@
 import React, { useState } from 'react';
 import { Carousel, Row, Col, Card } from 'react-bootstrap';
+import StarRating from './StarRating';
+import './MovieCarousel.css';
 
-const MovieCarousel = ({ movies, title, onLoadMore, currentPage, totalPages }) => {
+const MovieCarousel = ({ movies, title, onLoadMore, currentPage, totalPages, onRate }) => {
     const [currentSlide, setCurrentSlide] = useState(0);
     const [isLoading, setIsLoading] = useState(false);
 
@@ -22,6 +24,10 @@ const MovieCarousel = ({ movies, title, onLoadMore, currentPage, totalPages }) =
         }
     };
 
+    const handleRate = (movieId, rating) => {
+        onRate(movieId, rating);
+    };
+
     return (
         <div className="movie-section mb-5">
             <h2 className="mb-3">{title}</h2>
@@ -29,7 +35,7 @@ const MovieCarousel = ({ movies, title, onLoadMore, currentPage, totalPages }) =
                 interval={null} 
                 onSelect={handleSelect}
                 activeIndex={currentSlide}
-                wrap={false}  // Prevent wrapping to first slide
+                wrap={false}
             >
                 {movieGroups.map((group, index) => (
                     <Carousel.Item key={index}>
@@ -37,11 +43,20 @@ const MovieCarousel = ({ movies, title, onLoadMore, currentPage, totalPages }) =
                             {group.map((movie) => (
                                 <Col key={movie.id} xs={12} sm={6} md={3}>
                                     <Card className="movie-card h-100">
-                                        <Card.Img
-                                            variant="top"
-                                            src={`https://image.tmdb.org/t/p/w500${movie.poster_path}`}
-                                            alt={movie.title}
-                                        />
+                                        <div className="position-relative">
+                                            <Card.Img
+                                                variant="top"
+                                                src={`https://image.tmdb.org/t/p/w500${movie.poster_path}`}
+                                                alt={movie.title}
+                                            />
+                                            <div className="rating-container">
+                                                <StarRating
+                                                    initialRating={movie.userRating || 0}
+                                                    onRate={(rating) => handleRate(movie.id, rating)}
+                                                    size={24}
+                                                />
+                                            </div>
+                                        </div>
                                         <Card.Body>
                                             <Card.Title>{movie.title}</Card.Title>
                                         </Card.Body>
