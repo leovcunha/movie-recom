@@ -302,11 +302,24 @@ async def get_movies_by_genre(genre_id: int, page: int = 1):
 
 
 @app.get("/api/movies/popular")
-async def get_popular_movies():
+async def get_popular_movies(page: int = 1):
     try:
-        # Get popular movies from recommender
-        popular_movies = recommender.get_popular_movies(20)
-        movie_ids = list(popular_movies.keys())
+        # Get popular movies from recommender with pagination
+        items_per_page = 20
+        start_idx = (page - 1) * items_per_page
+        end_idx = start_idx + items_per_page
+        
+        # Get all popular movies and slice for pagination
+        all_popular_movies = recommender.get_popular_movies(100)  # Get more movies to support pagination
+        movie_ids = list(all_popular_movies.keys())[start_idx:end_idx]
+        
+        if not movie_ids:
+            return {
+                "results": [],
+                "total_results": len(all_popular_movies),
+                "page": page,
+                "total_pages": (len(all_popular_movies) + items_per_page - 1) // items_per_page
+            }
 
         # Make parallel requests for movie details
         async with aiohttp.ClientSession() as session:
@@ -321,16 +334,21 @@ async def get_popular_movies():
             
             responses = await asyncio.gather(*tasks)
             movies_data = []
-            for response in responses:
+            for response, movie_id in zip(responses, movie_ids):
                 if response.status == 200:
                     movie_data = await response.json()
+                    # Add view count from our dataset
+                    movie_data['view_count'] = all_popular_movies[movie_id]
                     movies_data.append(movie_data)
+
+        total_movies = len(all_popular_movies)
+        total_pages = (total_movies + items_per_page - 1) // items_per_page
 
         return {
             "results": movies_data,
-            "total_results": len(movies_data),
-            "page": 1,
-            "total_pages": 1
+            "total_results": total_movies,
+            "page": page,
+            "total_pages": total_pages
         }
     except Exception as e:
         logger.error(f"Error: {e}")

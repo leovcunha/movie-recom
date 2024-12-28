@@ -2,17 +2,12 @@ import axios from 'axios';
 
 const BACKEND_URL = process.env.BACKEND_URL || 'http://localhost:8000';
 
-export const fetchPopularMovies = async () => {
+export const fetchPopularMovies = async (page = 1) => {
     try {
-        const backendResponse = await axios.get(`${BACKEND_URL}/valid-movies`);
-        const popularMovies = backendResponse.data.popular_movies;
-        const movieDetails = backendResponse.data.movie_details;
-
-        return {
-            data: {
-                results: movieDetails,
-            },
-        };
+        const response = await axios.get(`${BACKEND_URL}/api/movies/popular`, {
+            params: { page }
+        });
+        return response;
     } catch (error) {
         console.error('Error fetching popular movies:', error);
         throw error;
