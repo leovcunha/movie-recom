@@ -134,17 +134,44 @@ class UserPreferences(BaseModel):
     ratings: Dict[int, float]
 
 
-@app.post("/recommendations/")
+@app.post("/api/recommendations")
 async def get_recommendations(preferences: UserPreferences):
     try:
-        # Convert string keys to integers in the preferences
-        int_preferences = {int(k): float(v) for k, v in preferences.ratings.items()}
-        recommendations = recommender.get_recommendations(int_preferences)
-
+        # Get recommendations from the model
+        recommendations = recommender.get_recommendations(preferences.ratings)
         if not recommendations:
             raise HTTPException(status_code=404, detail="No recommendations found")
 
-        return recommendations
+        # Fetch movie details for each recommendation
+        recommended_movies = []
+        async with aiohttp.ClientSession() as session:
+            tasks = []
+            for movie_id, predicted_rating in recommendations.items():
+                url = f"https://api.themoviedb.org/3/movie/{movie_id}"
+                params = {
+                    "api_key": TMDB_API_KEY,
+                    "language": "en-US"
+                }
+                tasks.append(session.get(url, params=params))
+            
+            responses = await asyncio.gather(*tasks)
+            for response, (movie_id, predicted_rating) in zip(responses, recommendations.items()):
+                if response.status == 200:
+                    movie_data = await response.json()
+                    recommended_movies.append({
+                        'id': int(movie_id),
+                        'title': movie_data['title'],
+                        'overview': movie_data['overview'],
+                        'poster_path': movie_data['poster_path'],
+                        'backdrop_path': movie_data['backdrop_path'],
+                        'predicted_rating': predicted_rating,
+                        'userRating': preferences.ratings.get(int(movie_id), 0)
+                    })
+
+        # Sort by predicted rating
+        recommended_movies.sort(key=lambda x: x['predicted_rating'], reverse=True)
+        return recommended_movies
+
     except Exception as e:
         logger.error(f"Error in recommendations endpoint: {e}")
         raise HTTPException(status_code=500, detail=str(e))
@@ -352,6 +379,34 @@ async def get_popular_movies(page: int = 1):
         }
     except Exception as e:
         logger.error(f"Error: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@app.get("/api/movies/details/{movie_id}")
+async def get_movie_details(movie_id: int):
+    try:
+        async with aiohttp.ClientSession() as session:
+            url = f"https://api.themoviedb.org/3/movie/{movie_id}"
+            params = {
+                "api_key": TMDB_API_KEY,
+                "language": "en-US"
+            }
+            
+            async with session.get(url, params=params) as response:
+                if response.status == 200:
+                    movie_data = await response.json()
+                    return {
+                        'id': movie_data['id'],
+                        'title': movie_data['title'],
+                        'overview': movie_data['overview'],
+                        'poster_path': movie_data['poster_path'],
+                        'backdrop_path': movie_data['backdrop_path'],
+                        'vote_average': movie_data['vote_average'],
+                        'release_date': movie_data['release_date']
+                    }
+                raise HTTPException(status_code=response.status, detail=f"TMDB API error: {response.status}")
+    except Exception as e:
+        logger.error(f"Error getting movie details: {e}")
         raise HTTPException(status_code=500, detail=str(e))
 
 

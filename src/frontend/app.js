@@ -1,22 +1,15 @@
 import React, { useState, useEffect } from 'react';
 import { createRoot } from 'react-dom/client';
-import { Container } from 'react-bootstrap';
+import { BrowserRouter as Router, Routes, Route } from 'react-router-dom';
 import { discoverMovies } from './actions/discoverMovies';
 import { fetchPopularMovies } from './actions/fetchPopularMovies';
 import { fetchGenreMovies } from './actions/fetchGenreMovies';
 import Header from './components/Header';
-import MovieCarousel from './components/MovieCarousel';
+import HomePage from './pages/HomePage';
+import RecommendationsPage from './pages/RecommendationsPage';
+import { GENRES } from './constants/genres';
 import 'bootstrap/dist/css/bootstrap.min.css';
 import '../main/main.css';
-
-const GENRES = [
-    { id: 28, name: 'Action' },
-    { id: 12, name: 'Adventure' },
-    { id: 35, name: 'Comedy' },
-    { id: 18, name: 'Drama' },
-    { id: 10751, name: 'Family' },
-    { id: 10749, name: 'Romance' },
-];
 
 const App = () => {
     const [isLoading, setIsLoading] = useState(false);
@@ -24,9 +17,15 @@ const App = () => {
     const [newReleases, setNewReleases] = useState({ results: [], page: 1 });
     const [genreMovies, setGenreMovies] = useState({});
     const [error, setError] = useState(null);
+    const [showRecommendations, setShowRecommendations] = useState(false);
+    const [userRatings, setUserRatings] = useState({});
 
     useEffect(() => {
         fetchAllMovies();
+        // Load saved ratings from localStorage
+        const savedRatings = JSON.parse(localStorage.getItem('userRatings') || '{}');
+        setUserRatings(savedRatings);
+        setShowRecommendations(Object.keys(savedRatings).length >= 5);
     }, []);
 
     const loadMoreMovies = async (fetchFunction, currentState, setState, params = {}) => {
@@ -39,7 +38,10 @@ const App = () => {
                     ...prev,
                     [params.genreId]: {
                         ...response.data,
-                        results: [...prev[params.genreId].results, ...response.data.results],
+                        results: [...prev[params.genreId].results, ...response.data.results].map(movie => ({
+                            ...movie,
+                            userRating: userRatings[movie.id] || 0
+                        })),
                         page: nextPage,
                         total_pages: response.data.total_pages
                     }
@@ -47,13 +49,62 @@ const App = () => {
             } else {
                 setState(prev => ({
                     ...response.data,
-                    results: [...prev.results, ...response.data.results],
+                    results: [...prev.results, ...response.data.results].map(movie => ({
+                        ...movie,
+                        userRating: userRatings[movie.id] || 0
+                    })),
                     page: nextPage
                 }));
             }
         } catch (err) {
             console.error('Error loading more movies:', err);
         }
+    };
+
+    const handleRate = (movieId, rating) => {
+        const newRatings = { ...userRatings, [movieId]: rating };
+        setUserRatings(newRatings);
+        localStorage.setItem('userRatings', JSON.stringify(newRatings));
+        
+        // Show recommendations tab if user has rated at least 5 movies
+        if (Object.keys(newRatings).length >= 5) {
+            setShowRecommendations(true);
+        }
+
+        // Update movie ratings in all lists
+        updateMovieRatings(movieId, rating);
+    };
+
+    const updateMovieRatings = (movieId, rating) => {
+        // Update popular movies
+        setPopularMovies(prev => ({
+            ...prev,
+            results: prev.results.map(movie => 
+                movie.id === movieId ? { ...movie, userRating: rating } : movie
+            )
+        }));
+
+        // Update new releases
+        setNewReleases(prev => ({
+            ...prev,
+            results: prev.results.map(movie => 
+                movie.id === movieId ? { ...movie, userRating: rating } : movie
+            )
+        }));
+
+        // Update genre movies
+        setGenreMovies(prev => {
+            const updated = { ...prev };
+            Object.keys(updated).forEach(genreId => {
+                updated[genreId] = {
+                    ...updated[genreId],
+                    results: updated[genreId].results.map(movie => 
+                        movie.id === movieId ? { ...movie, userRating: rating } : movie
+                    )
+                };
+            });
+            return updated;
+        });
     };
 
     const fetchAllMovies = async () => {
@@ -64,14 +115,37 @@ const App = () => {
                 discoverMovies(1)
             ]);
             
-            setPopularMovies(popularRes.data);
-            setNewReleases(newReleasesRes.data);
+            // Add user ratings to movies
+            const popularWithRatings = {
+                ...popularRes.data,
+                results: popularRes.data.results.map(movie => ({
+                    ...movie,
+                    userRating: userRatings[movie.id] || 0
+                }))
+            };
+
+            const newReleasesWithRatings = {
+                ...newReleasesRes.data,
+                results: newReleasesRes.data.results.map(movie => ({
+                    ...movie,
+                    userRating: userRatings[movie.id] || 0
+                }))
+            };
+
+            setPopularMovies(popularWithRatings);
+            setNewReleases(newReleasesWithRatings);
 
             // Fetch movies for each genre
             const genreResults = {};
             for (const genre of GENRES) {
                 const genreRes = await fetchGenreMovies(genre.id);
-                genreResults[genre.id] = genreRes.data;
+                genreResults[genre.id] = {
+                    ...genreRes.data,
+                    results: genreRes.data.results.map(movie => ({
+                        ...movie,
+                        userRating: userRatings[movie.id] || 0
+                    }))
+                };
             }
             setGenreMovies(genreResults);
         } catch (err) {
@@ -83,54 +157,36 @@ const App = () => {
     };
 
     return (
-        <div className="app-container">
-            <Header />
-            <Container fluid>
-                {error && <div className="error alert alert-danger">{error}</div>}
-                {isLoading ? (
-                    <div className="text-center my-5">
-                        <div className="spinner-border" role="status">
-                            <span className="visually-hidden">Loading...</span>
-                        </div>
-                    </div>
-                ) : (
-                    <>
-                        {popularMovies.results.length > 0 && (
-                            <MovieCarousel
-                                movies={popularMovies.results}
-                                title="Most Viewed Movies"
-                                onLoadMore={() => loadMoreMovies(fetchPopularMovies, popularMovies, setPopularMovies)}
-                                currentPage={popularMovies.page}
-                                totalPages={popularMovies.total_pages}
+        <Router>
+            <div className="app-container">
+                <Header showRecommendations={showRecommendations} />
+                <Routes>
+                    <Route 
+                        path="/" 
+                        element={
+                            <HomePage 
+                                popularMovies={popularMovies}
+                                newReleases={newReleases}
+                                genreMovies={genreMovies}
+                                isLoading={isLoading}
+                                error={error}
+                                loadMoreMovies={loadMoreMovies}
+                                handleRate={handleRate}
+                                setPopularMovies={setPopularMovies}
+                                setNewReleases={setNewReleases}
+                                setGenreMovies={setGenreMovies}
                             />
-                        )}
-
-                        {newReleases.results.length > 0 && (
-                            <MovieCarousel
-                                movies={newReleases.results}
-                                title="New Releases"
-                                onLoadMore={() => loadMoreMovies(discoverMovies, newReleases, setNewReleases)}
-                                currentPage={newReleases.page}
-                                totalPages={newReleases.total_pages}
-                            />
-                        )}
-
-                        {GENRES.map(genre => (
-                            genreMovies[genre.id]?.results.length > 0 && (
-                                <MovieCarousel
-                                    key={genre.id}
-                                    movies={genreMovies[genre.id].results}
-                                    title={`${genre.name} Movies`}
-                                    onLoadMore={() => loadMoreMovies(fetchGenreMovies, genreMovies[genre.id], setGenreMovies, { genreId: genre.id })}
-                                    currentPage={genreMovies[genre.id]?.page || 1}
-                                    totalPages={genreMovies[genre.id]?.total_pages || 1}
-                                />
-                            )
-                        ))}
-                    </>
-                )}
-            </Container>
-        </div>
+                        } 
+                    />
+                    {showRecommendations && (
+                        <Route 
+                            path="/recommendations" 
+                            element={<RecommendationsPage onRate={handleRate} />} 
+                        />
+                    )}
+                </Routes>
+            </div>
+        </Router>
     );
 };
 

@@ -1,0 +1,44 @@
+.custom-navbar {
+  padding: 1rem 0;
+  box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+  background-color: #343a40;
+}
+
+.brand {
+  font-size: 1.8rem !important;
+  font-weight: bold !important;
+  padding: 0 !important;
+  color: #fff !important;
+}
+
+.nav-item {
+  font-size: 1.1rem;
+  margin: 0 1rem;
+  position: relative;
+  color: rgba(255, 255, 255, 0.85) !important;
+}
+
+.nav-item:hover {
+  color: #fff !important;
+}
+
+.nav-item:after {
+  content: '';
+  position: absolute;
+  bottom: -2px;
+  left: 0;
+  width: 0;
+  height: 2px;
+  background-color: #fff;
+  transition: width 0.3s ease-in-out;
+}
+
+.nav-item:hover:after,
+.nav-item.active:after {
+  width: 100%;
+}
+
+.nav-item.active {
+  color: #fff !important;
+  font-weight: 500;
+} 
