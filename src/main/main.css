@@ -8,15 +8,27 @@ body {
     padding: 20px;
 }
 
+
 .movie-section {
     margin-bottom: 2rem;
 }
 
 .movie-section h2 {
     color: rgb(230, 230, 230);
-    margin-bottom: 1rem;
-    font-size: 1.8rem;
+    margin-top: 2rem;
+    margin-bottom: -1rem !important;
+    margin-left: 4rem;
+    font-size: 1.0rem;
 }
+
+@media (max-width: 768px) {
+    .app-container {
+        padding: 2px;
+    }
+    .movie-section h2 {
+        margin-left: 4%;
+    }
+  }
 
 .movie-card {
     margin: 10px;

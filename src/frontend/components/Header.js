@@ -20,15 +20,14 @@ export default function Header({ showRecommendations }) {
             >
               Home
             </Nav.Link>
-            {showRecommendations && (
-              <Nav.Link 
-                as={Link} 
-                to="/recommendations" 
-                className={`nav-item ${location.pathname === '/recommendations' ? 'active' : ''}`}
-              >
-                Recommendations
-              </Nav.Link>
-            )}
+            <Nav.Link 
+              as={Link} 
+              to="/recommendations" 
+              className={`nav-item ${location.pathname === '/recommendations' ? 'active' : ''}`}
+            >
+              Recommendations
+            </Nav.Link>
+            
           </Nav>
         </Navbar.Collapse>
       </Container>

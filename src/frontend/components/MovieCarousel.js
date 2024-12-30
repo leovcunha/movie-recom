@@ -7,10 +7,18 @@ const MovieCarousel = ({ movies, title, onLoadMore, currentPage, totalPages, onR
     const [currentSlide, setCurrentSlide] = useState(0);
     const [isLoading, setIsLoading] = useState(false);
 
-    // Group movies into sets of 4 for each carousel slide
+    // Calculate number of movies per slide based on screen size
+    const getMoviesPerSlide = () => {
+      if (window.innerWidth < 576) return 2; // Mobile
+      if (window.innerWidth < 768) return 3; // Tablet
+      return 5; // Desktop
+    };
+
+    // Group movies into sets for each carousel slide
     const movieGroups = [];
-    for (let i = 0; i < movies.length; i += 4) {
-        movieGroups.push(movies.slice(i, i + 4));
+    const moviesPerSlide = getMoviesPerSlide();
+    for (let i = 0; i < movies.length; i += moviesPerSlide) {
+        movieGroups.push(movies.slice(i, i + moviesPerSlide));
     }
 
     const handleSelect = async (selectedIndex) => {
@@ -41,7 +49,7 @@ const MovieCarousel = ({ movies, title, onLoadMore, currentPage, totalPages, onR
                     <Carousel.Item key={index}>
                         <Row>
                             {group.map((movie) => (
-                                <Col key={movie.id} xs={12} sm={6} md={3}>
+                                <Col key={movie.id} className="movie-col">
                                     <Card className="movie-card h-100">
                                         <div className="position-relative">
                                             <Card.Img
@@ -71,4 +79,4 @@ const MovieCarousel = ({ movies, title, onLoadMore, currentPage, totalPages, onR
     );
 };
 
-export default MovieCarousel; 
+export default MovieCarousel;
