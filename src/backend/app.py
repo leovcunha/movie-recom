@@ -139,6 +139,24 @@ async def get_recommendations(preferences: UserPreferences):
     try:
         # Get recommendations from the model
         recommendations = recommender.get_recommendations(preferences.ratings)
+            
+        # Handle missing movies by fetching similar movies from TMDB
+        missing_movie_ids = []
+        for movie_id in preferences.ratings:
+            if str(movie_id) not in recommender.movie_id_map and preferences.ratings[movie_id] > 3.0:
+                missing_movie_ids.append(movie_id)
+                
+        if missing_movie_ids:
+            logger.info(f"Movies not found in local data: {missing_movie_ids}")
+            
+            # Fetch similar movies for each missing movie
+            similar_movies = await fetch_similar_movies_from_tmdb(missing_movie_ids)
+            
+            # Add similar movies to recommendations with a default rating
+            for movie_id, similar_movie_list in similar_movies.items():
+                for similar_movie in similar_movie_list:
+                    recommendations[str(similar_movie['id'])] = 3.0
+            
         if not recommendations:
             raise HTTPException(status_code=404, detail="No recommendations found")
 
@@ -175,6 +193,67 @@ async def get_recommendations(preferences: UserPreferences):
     except Exception as e:
         logger.error(f"Error in recommendations endpoint: {e}")
         raise HTTPException(status_code=500, detail=str(e))
+
+async def fetch_similar_movies_from_tmdb(movie_ids: list[int], n: int = 5) -> Dict[int, list]:
+    """
+    Fetches similar movies from TMDB for a list of movie IDs, filtered to be within ±2 years of the original movie's release year.
+
+    Args:
+        movie_ids (list[int]): List of movie IDs for which to find similar movies.
+        n (int): Number of similar movies to return for each movie.
+
+    Returns:
+        Dict[int, list]: Dictionary of {movie_id: list of similar movies}
+    """
+    similar_movies_dict = {}
+    async with aiohttp.ClientSession() as session:
+        for movie_id in movie_ids:
+            # First get the original movie's release year
+            try:
+                url = f"https://api.themoviedb.org/3/movie/{movie_id}"
+                params = {
+                    "api_key": TMDB_API_KEY,
+                    "language": "en-US"
+                }
+                async with session.get(url, params=params) as response:
+                    if response.status == 200:
+                        movie_data = await response.json()
+                        release_date = movie_data.get('release_date', '')
+                        if release_date:
+                            release_year = int(release_date[:4])
+                            min_year = release_year - 3
+                            max_year = release_year + 3
+                            
+                            # Now get similar movies
+                            url = f"https://api.themoviedb.org/3/movie/{movie_id}/similar"
+                            params = {
+                                "api_key": TMDB_API_KEY,
+                                "language": "en-US",
+                                "page": "1"
+                            }
+                            async with session.get(url, params=params) as similar_response:
+                                if similar_response.status == 200:
+                                    data = await similar_response.json()
+                                    # Filter similar movies by release year
+                                    similar_movies = [
+                                        movie for movie in data.get('results', [])
+                                        if movie.get('release_date', '') and 
+                                        min_year <= int(movie['release_date'][:4]) <= max_year
+                                    ][:n]
+                                    similar_movies_dict[movie_id] = similar_movies
+                                else:
+                                    logger.error(f"Error fetching similar movies for {movie_id}: {similar_response.status} - {similar_response.reason}")
+                                    similar_movies_dict[movie_id] = []
+                        else:
+                            logger.error(f"Could not get release date for movie {movie_id}")
+                            similar_movies_dict[movie_id] = []
+                    else:
+                        logger.error(f"Error fetching movie details for {movie_id}: {response.status} - {response.reason}")
+                        similar_movies_dict[movie_id] = []
+            except Exception as e:
+                logger.error(f"Error fetching similar movies for {movie_id}: {e}")
+                similar_movies_dict[movie_id] = []
+    return similar_movies_dict
 
 
 @app.get("/health")

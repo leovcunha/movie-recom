@@ -178,12 +178,10 @@ const App = () => {
                             />
                         } 
                     />
-                    {showRecommendations && (
-                        <Route 
-                            path="/recommendations" 
-                            element={<RecommendationsPage onRate={handleRate} />} 
-                        />
-                    )}
+                    <Route 
+                        path="/recommendations" 
+                        element={<RecommendationsPage onRate={handleRate} />} 
+                    />
                 </Routes>
             </div>
         </Router>

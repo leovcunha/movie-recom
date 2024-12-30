@@ -17,6 +17,12 @@ const RecommendationsPage = ({ onRate }) => {
     try {
       const userRatings = JSON.parse(localStorage.getItem('userRatings') || '{}');
       
+      // Check if there are at least 5 ratings
+      if (Object.keys(userRatings).length < 5) {
+        setRecommendations([]);
+        return;
+      }
+
       // Convert ratings to numbers
       const ratings = {};
       Object.entries(userRatings).forEach(([key, value]) => {
@@ -47,6 +53,13 @@ const RecommendationsPage = ({ onRate }) => {
     );
   };
 
+  const handleReset = () => {
+    localStorage.removeItem('userRatings');
+    setRecommendations([]);
+    // Optionally refresh the page to start completely fresh
+    window.location.reload();
+  };
+
   if (loading) {
     return (
       <Container className="recommendations-container">
@@ -70,6 +83,14 @@ const RecommendationsPage = ({ onRate }) => {
       <div className="recommendations-header">
         <h1>Your Personalized Recommendations</h1>
         <p>Based on your movie ratings</p>
+        {recommendations.length > 0 &&
+        <button 
+          className="btn btn-warning mb-3" 
+          onClick={handleReset}
+        >
+          Reset All Ratings
+        </button>
+        }
       </div>
       
       {recommendations.length > 0 ? (
@@ -110,4 +131,4 @@ const RecommendationsPage = ({ onRate }) => {
   );
 };
 
-export default RecommendationsPage; 
+export default RecommendationsPage;
