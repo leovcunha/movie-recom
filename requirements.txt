@@ -8,4 +8,6 @@ numpy==1.26.2
 pytest==7.4.3
 pytest-cov==4.1.0
 httpx==0.25.2 
-aiohttp==3.9.1 
+aiohttp==3.9.1
+polars==0.20.7
+pyarrow==14.0.1

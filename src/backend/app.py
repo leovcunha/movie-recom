@@ -120,7 +120,7 @@ async def read_root():
 
 # Update path to be relative to this file
 current_dir = os.path.dirname(os.path.abspath(__file__))
-data_path = os.path.join(current_dir, "data", "ratings_small.csv")
+data_path = os.path.join(current_dir, "data", "ratings_tmdb.parquet")  # Changed to parquet file
 
 # Initialize recommender once when starting the server
 try:
@@ -137,34 +137,51 @@ class UserPreferences(BaseModel):
 @app.post("/api/recommendations")
 async def get_recommendations(preferences: UserPreferences):
     try:
+        # Debug logging
+        logger.debug(f"Received preferences: {preferences.ratings}")
+        
         # Get recommendations from the model
         recommendations = recommender.get_recommendations(preferences.ratings)
+        logger.debug(f"Raw recommendations from model: {recommendations}")
             
-        # Handle missing movies by fetching similar movies from TMDB
+        # Check if movies exist in our dataset more accurately
         missing_movie_ids = []
+        movie_ids_in_dataset = set(recommender.movie_map["tmdbId"].to_list())
+        
         for movie_id in preferences.ratings:
-            if str(movie_id) not in recommender.movie_id_map and preferences.ratings[movie_id] > 3.0:
+            # Debug logging for movie existence check
+            logger.debug(f"Checking movie {movie_id} in dataset")
+            
+            if movie_id not in movie_ids_in_dataset and preferences.ratings[movie_id] > 3.0:
                 missing_movie_ids.append(movie_id)
+                logger.debug(f"Movie {movie_id} not found in dataset")
                 
         if missing_movie_ids:
             logger.info(f"Movies not found in local data: {missing_movie_ids}")
             
             # Fetch similar movies for each missing movie
             similar_movies = await fetch_similar_movies_from_tmdb(missing_movie_ids)
+            logger.debug(f"Similar movies fetched: {similar_movies}")
             
-            # Add similar movies to recommendations with a default rating
+            # Add similar movies to recommendations
             for movie_id, similar_movie_list in similar_movies.items():
                 for similar_movie in similar_movie_list:
-                    recommendations[str(similar_movie['id'])] = 3.0
+                    if 'recommendations' not in recommendations:
+                        recommendations['recommendations'] = {}
+                    recommendations['recommendations'][str(similar_movie['id'])] = round(similar_movie['vote_average'] / 2, 1)
             
-        if not recommendations:
+        if not recommendations or not recommendations.get('recommendations'):
+            logger.warning("No recommendations generated")
             raise HTTPException(status_code=404, detail="No recommendations found")
+
+        # Debug logging before fetching movie details
+        logger.debug(f"Final recommendations before details: {recommendations}")
 
         # Fetch movie details for each recommendation
         recommended_movies = []
         async with aiohttp.ClientSession() as session:
             tasks = []
-            for movie_id, predicted_rating in recommendations.items():
+            for movie_id, predicted_rating in recommendations['recommendations'].items():
                 url = f"https://api.themoviedb.org/3/movie/{movie_id}"
                 params = {
                     "api_key": TMDB_API_KEY,
@@ -173,7 +190,7 @@ async def get_recommendations(preferences: UserPreferences):
                 tasks.append(session.get(url, params=params))
             
             responses = await asyncio.gather(*tasks)
-            for response, (movie_id, predicted_rating) in zip(responses, recommendations.items()):
+            for response, (movie_id, predicted_rating) in zip(responses, recommendations['recommendations'].items()):
                 if response.status == 200:
                     movie_data = await response.json()
                     recommended_movies.append({
@@ -188,6 +205,7 @@ async def get_recommendations(preferences: UserPreferences):
 
         # Sort by predicted rating
         recommended_movies.sort(key=lambda x: x['predicted_rating'], reverse=True)
+        logger.debug(f"Final recommendations: {recommended_movies}")
         return recommended_movies
 
     except Exception as e:
@@ -196,7 +214,8 @@ async def get_recommendations(preferences: UserPreferences):
 
 async def fetch_similar_movies_from_tmdb(movie_ids: list[int], n: int = 5) -> Dict[int, list]:
     """
-    Fetches similar movies from TMDB for a list of movie IDs, filtered to be within ±2 years of the original movie's release year.
+    Fetches similar movies from TMDB for a list of movie IDs, filtered to be within ±3 years of the original movie's release year
+    and with a minimum rating of 3.5.
 
     Args:
         movie_ids (list[int]): List of movie IDs for which to find similar movies.
@@ -224,6 +243,9 @@ async def fetch_similar_movies_from_tmdb(movie_ids: list[int], n: int = 5) -> Di
                             min_year = release_year - 3
                             max_year = release_year + 3
                             
+                            # Log original movie details
+                            logger.info(f"Fetching similar movies for: {movie_data['title']} ({release_year})")
+                            
                             # Now get similar movies
                             url = f"https://api.themoviedb.org/3/movie/{movie_id}/similar"
                             params = {
@@ -234,12 +256,19 @@ async def fetch_similar_movies_from_tmdb(movie_ids: list[int], n: int = 5) -> Di
                             async with session.get(url, params=params) as similar_response:
                                 if similar_response.status == 200:
                                     data = await similar_response.json()
-                                    # Filter similar movies by release year
+                                    # Filter similar movies by release year and rating
                                     similar_movies = [
                                         movie for movie in data.get('results', [])
                                         if movie.get('release_date', '') and 
-                                        min_year <= int(movie['release_date'][:4]) <= max_year
+                                        min_year <= int(movie['release_date'][:4]) <= max_year and
+                                        movie.get('vote_average', 0)/2 >= 3.5
                                     ][:n]
+                                    
+                                    # Log similar movies found
+                                    logger.info(f"Found {len(similar_movies)} similar movies for {movie_data['title']}")
+                                    for sm in similar_movies:
+                                        logger.debug(f"Similar movie: {sm['title']} ({sm['release_date'][:4]}) - Rating: {sm['vote_average']}")
+                                    
                                     similar_movies_dict[movie_id] = similar_movies
                                 else:
                                     logger.error(f"Error fetching similar movies for {movie_id}: {similar_response.status} - {similar_response.reason}")
@@ -253,6 +282,11 @@ async def fetch_similar_movies_from_tmdb(movie_ids: list[int], n: int = 5) -> Di
             except Exception as e:
                 logger.error(f"Error fetching similar movies for {movie_id}: {e}")
                 similar_movies_dict[movie_id] = []
+    
+    # Log total similar movies found across all input movies
+    total_similar = sum(len(movies) for movies in similar_movies_dict.values())
+    logger.info(f"Found {total_similar} similar movies across {len(movie_ids)} input movies")
+    
     return similar_movies_dict
 
 
