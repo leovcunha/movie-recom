@@ -205,7 +205,7 @@ async def get_recommendations(preferences: UserPreferences):
 
         # Sort by predicted rating
         recommended_movies.sort(key=lambda x: x['predicted_rating'], reverse=True)
-        logger.debug(f"Final recommendations: {recommended_movies}")
+
         return recommended_movies
 
     except Exception as e:
@@ -401,20 +401,27 @@ async def get_movies_by_genre(genre_id: int, page: int = 1):
 
         async with aiohttp.ClientSession() as session:
             url = "https://api.themoviedb.org/3/discover/movie"
+            
+            # If it's Action genre, include Adventure genre as well
+            genres_param = f"{genre_id},12" if genre_id == 28 else str(genre_id)
+            
             params = {
                 "api_key": TMDB_API_KEY,
                 "language": "en-US",
-                "with_genres": str(genre_id),
-                "sort_by": "vote_average.desc",
+                "with_genres": genres_param,
+                "sort_by": "popularity.desc",
                 "include_adult": "false",
                 "include_video": "false",
                 "page": str(page),
-                "vote_count.gte": "100"
+                "vote_count.gte": "200",
+                "vote_average.gte": "6.0",
+                "with_original_language": "en"
             }
             
             async with session.get(url, params=params) as response:
                 if response.status == 200:
                     data = await response.json()
+                    
                     result = {
                         'results': [{
                             'id': movie['id'],
@@ -521,6 +528,16 @@ async def get_movie_details(movie_id: int):
     except Exception as e:
         logger.error(f"Error getting movie details: {e}")
         raise HTTPException(status_code=500, detail=str(e))
+
+
+# Add at the top of the file with other constants
+GENRES = [
+    28,     # Action & Adventure (will fetch both)
+    35,     # Comedy
+    18,     # Drama
+    10751,  # Family
+    10749   # Romance
+]
 
 
 if __name__ == "__main__":

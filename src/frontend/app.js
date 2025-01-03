@@ -28,85 +28,6 @@ const App = () => {
         setShowRecommendations(Object.keys(savedRatings).length >= 5);
     }, []);
 
-    const loadMoreMovies = async (fetchFunction, currentState, setState, params = {}) => {
-        try {
-            const nextPage = currentState.page + 1;
-            const response = await fetchFunction(params.genreId ? params.genreId : nextPage);
-            
-            if (params.genreId) {
-                setState(prev => ({
-                    ...prev,
-                    [params.genreId]: {
-                        ...response.data,
-                        results: [...prev[params.genreId].results, ...response.data.results].map(movie => ({
-                            ...movie,
-                            userRating: userRatings[movie.id] || 0
-                        })),
-                        page: nextPage,
-                        total_pages: response.data.total_pages
-                    }
-                }));
-            } else {
-                setState(prev => ({
-                    ...response.data,
-                    results: [...prev.results, ...response.data.results].map(movie => ({
-                        ...movie,
-                        userRating: userRatings[movie.id] || 0
-                    })),
-                    page: nextPage
-                }));
-            }
-        } catch (err) {
-            console.error('Error loading more movies:', err);
-        }
-    };
-
-    const handleRate = (movieId, rating) => {
-        const newRatings = { ...userRatings, [movieId]: rating };
-        setUserRatings(newRatings);
-        localStorage.setItem('userRatings', JSON.stringify(newRatings));
-        
-        // Show recommendations tab if user has rated at least 5 movies
-        if (Object.keys(newRatings).length >= 5) {
-            setShowRecommendations(true);
-        }
-
-        // Update movie ratings in all lists
-        updateMovieRatings(movieId, rating);
-    };
-
-    const updateMovieRatings = (movieId, rating) => {
-        // Update popular movies
-        setPopularMovies(prev => ({
-            ...prev,
-            results: prev.results.map(movie => 
-                movie.id === movieId ? { ...movie, userRating: rating } : movie
-            )
-        }));
-
-        // Update new releases
-        setNewReleases(prev => ({
-            ...prev,
-            results: prev.results.map(movie => 
-                movie.id === movieId ? { ...movie, userRating: rating } : movie
-            )
-        }));
-
-        // Update genre movies
-        setGenreMovies(prev => {
-            const updated = { ...prev };
-            Object.keys(updated).forEach(genreId => {
-                updated[genreId] = {
-                    ...updated[genreId],
-                    results: updated[genreId].results.map(movie => 
-                        movie.id === movieId ? { ...movie, userRating: rating } : movie
-                    )
-                };
-            });
-            return updated;
-        });
-    };
-
     const fetchAllMovies = async () => {
         try {
             setIsLoading(true);
@@ -154,6 +75,134 @@ const App = () => {
         } finally {
             setIsLoading(false);
         }
+    };
+
+    const loadMoreMovies = async (fetchFunction, currentState, setState, params = {}) => {
+        try {
+            if (params.genreId) {
+                // For genre-specific movies
+                const nextPage = currentState.page + 1;
+                console.log('Genre Movies - Before API call:', {
+                    genreId: params.genreId,
+                    currentState,
+                    nextPage,
+                    currentResults: currentState.results
+                });
+
+                const response = await fetchFunction(params.genreId, nextPage);
+                console.log('Genre Movies - API Response:', {
+                    genreId: params.genreId,
+                    responseData: response.data,
+                    newMoviesCount: response.data.results.length
+                });
+                
+                setState(prev => {
+                    const currentResults = currentState.results || [];
+                    const existingIds = new Set(currentResults.map(m => m.id));
+                    const newMovies = response.data.results;
+                    
+                    console.log('Genre Movies - State Update:', {
+                        genreId: params.genreId,
+                        currentResultsCount: currentResults.length,
+                        newMoviesCount: newMovies.length,
+                        existingIds: Array.from(existingIds),
+                        nextPage
+                    });
+
+                    return {
+                        ...prev,
+                        [params.genreId]: {
+                            ...response.data,
+                            results: [...currentResults, ...newMovies].map(movie => ({
+                                ...movie,
+                                userRating: userRatings[movie.id] || 0
+                            })),
+                            page: nextPage,
+                            total_pages: response.data.total_pages
+                        }
+                    };
+                });
+            } else {
+                // For popular movies and new releases
+                const nextPage = currentState.page + 1;
+                console.log('Regular Movies - Before API call:', {
+                    currentState,
+                    nextPage,
+                    currentResults: currentState.results
+                });
+
+                const response = await fetchFunction(nextPage);
+                console.log('Regular Movies - API Response:', {
+                    responseData: response.data,
+                    newMoviesCount: response.data.results.length
+                });
+                
+                setState(prev => {
+                    const existingIds = new Set(prev.results.map(m => m.id));
+                    const newMovies = response.data.results.filter(movie => !existingIds.has(movie.id));
+                    
+                    console.log('Regular Movies - State Update:', {
+                        currentResultsCount: prev.results.length,
+                        newMoviesCount: newMovies.length,
+                        existingIds: Array.from(existingIds),
+                        nextPage
+                    });
+
+                    return {
+                        ...response.data,
+                        results: [...prev.results, ...newMovies].map(movie => ({
+                            ...movie,
+                            userRating: userRatings[movie.id] || 0
+                        })),
+                        page: nextPage,
+                        total_pages: response.data.total_pages
+                    };
+                });
+            }
+        } catch (err) {
+            console.error('Error loading more movies:', err);
+        }
+    };
+
+    const handleRate = (movieId, rating) => {
+        const newRatings = { ...userRatings, [movieId]: rating };
+        setUserRatings(newRatings);
+        localStorage.setItem('userRatings', JSON.stringify(newRatings));
+        
+        if (Object.keys(newRatings).length >= 5) {
+            setShowRecommendations(true);
+        }
+
+        updateMovieRatings(movieId, rating);
+    };
+
+    const updateMovieRatings = (movieId, rating) => {
+        setPopularMovies(prev => ({
+            ...prev,
+            results: prev.results.map(movie => 
+                movie.id === movieId ? { ...movie, userRating: rating } : movie
+            )
+        }));
+
+        setNewReleases(prev => ({
+            ...prev,
+            results: prev.results.map(movie => 
+                movie.id === movieId ? { ...movie, userRating: rating } : movie
+            )
+        }));
+
+        setGenreMovies(prev => {
+            const updated = { ...prev };
+            Object.keys(updated).forEach(genreId => {
+                updated[genreId] = {
+                    ...updated[genreId],
+                    results: updated[genreId].results.map(movie => 
+                        movie.id === movieId ? { ...movie, userRating: rating } : movie
+                    )
+                };
+            });
+            return updated;
+        });
     };
 
     return (

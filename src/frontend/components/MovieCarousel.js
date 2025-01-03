@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { Carousel, Row, Col, Card } from 'react-bootstrap';
 import StarRating from './StarRating';
 import './MovieCarousel.css';
@@ -6,17 +6,19 @@ import './MovieCarousel.css';
 const MovieCarousel = ({ movies, title, onLoadMore, currentPage, totalPages, onRate }) => {
     const [currentSlide, setCurrentSlide] = useState(0);
     const [isLoading, setIsLoading] = useState(false);
+    const [hasLoadedMore, setHasLoadedMore] = useState(false);
 
     // Calculate number of movies per slide based on screen size
     const getMoviesPerSlide = () => {
-      if (window.innerWidth < 576) return 2; // Mobile
-      if (window.innerWidth < 768) return 3; // Tablet
-      return 5; // Desktop
+        if (window.innerWidth < 576) return 2; // Mobile
+        if (window.innerWidth < 768) return 3; // Tablet
+        return 5; // Desktop
     };
 
-    // Group movies into sets for each carousel slide
-    const movieGroups = [];
     const moviesPerSlide = getMoviesPerSlide();
+    const movieGroups = [];
+    
+    // Group movies into sets for each carousel slide
     for (let i = 0; i < movies.length; i += moviesPerSlide) {
         movieGroups.push(movies.slice(i, i + moviesPerSlide));
     }
@@ -24,13 +26,25 @@ const MovieCarousel = ({ movies, title, onLoadMore, currentPage, totalPages, onR
     const handleSelect = async (selectedIndex) => {
         setCurrentSlide(selectedIndex);
         
-        // If we're at the last slide and there are more pages to load
-        if (selectedIndex === movieGroups.length - 1 && onLoadMore && currentPage < totalPages && !isLoading) {
+        // Load more only when we reach the last slide
+        if (selectedIndex === movieGroups.length - 1 && 
+            onLoadMore && 
+            currentPage < totalPages && 
+            !isLoading && 
+            !hasLoadedMore) {
             setIsLoading(true);
+            setHasLoadedMore(true);
             await onLoadMore();
             setIsLoading(false);
+            // Reset hasLoadedMore after a delay
+            setTimeout(() => setHasLoadedMore(false), 1500);
         }
     };
+
+    // Reset hasLoadedMore when page changes
+    useEffect(() => {
+        setHasLoadedMore(false);
+    }, [currentPage]);
 
     const handleRate = (movieId, rating) => {
         onRate(movieId, rating);

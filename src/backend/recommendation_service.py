@@ -352,17 +352,27 @@ class MovieRecommender:
             predicted_ratings = np.zeros_like(weighted_sum)
             predicted_ratings[mask] = weighted_sum[mask] / similarity_sum[mask]
             
-            # Scale predictions
-            min_rating, max_rating = 1.0, 5.0
-            predicted_ratings = (predicted_ratings - predicted_ratings.min()) / \
-                              (predicted_ratings.max() - predicted_ratings.min()) * \
-                              (max_rating - min_rating) + min_rating
-            
-            # Log prediction stats
-            nonzero_predictions = predicted_ratings[predicted_ratings > 0]
-            self.logger.debug(f"Predictions stats - min: {nonzero_predictions.min():.2f}, " + 
-                             f"max: {nonzero_predictions.max():.2f}, " + 
-                             f"mean: {nonzero_predictions.mean():.2f}")
+            # Scale predictions while preserving relative differences
+            nonzero_mask = predicted_ratings > 0
+            if nonzero_mask.any():
+                # Get prediction statistics
+                pred_min = predicted_ratings[nonzero_mask].min()
+                pred_max = predicted_ratings[nonzero_mask].max()
+                pred_mean = predicted_ratings[nonzero_mask].mean()
+                pred_std = predicted_ratings[nonzero_mask].std()
+                
+                if pred_std > 0:
+                    # Use z-score transformation then scale to target range
+                    z_scores = (predicted_ratings[nonzero_mask] - pred_mean) / pred_std
+                    # Scale to 3.5-5.0 range with sigmoid-like squashing
+                    scaled_ratings = 3.5 + 1.5 / (1 + np.exp(-z_scores))
+                    predicted_ratings[nonzero_mask] = scaled_ratings
+                else:
+                    # If no variation, scale linearly
+                    predicted_ratings[nonzero_mask] = 3.5 + 1.5 * (
+                        (predicted_ratings[nonzero_mask] - pred_min) / 
+                        (pred_max - pred_min if pred_max > pred_min else 1)
+                    )
             
             # Convert to recommendations
             recommendations = {}
@@ -370,7 +380,7 @@ class MovieRecommender:
                 if rating > 3.5:
                     movie_id = self.reverse_movie_id_map[idx]
                     if movie_id not in rated_movies:
-                        recommendations[str(movie_id)] = float(rating)
+                        recommendations[str(movie_id)] = round(float(rating), 2)
             
             # Log final recommendations stats
             self.logger.debug(f"Generated {len(recommendations)} recommendations above threshold")
