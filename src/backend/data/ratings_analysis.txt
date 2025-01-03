@@ -1,0 +1,9 @@
+Analysis Date: 2025-01-03 00:19:34.196620
+
+Dataset Shape: (25000095, 4)
+Total Users: 162541
+Total Movies: 58912
+Total Ratings: 25000095
+Rating Matrix Sparsity: 99.74%
+Average Ratings per User: 153.81
+Average Ratings per Movie: 424.36
