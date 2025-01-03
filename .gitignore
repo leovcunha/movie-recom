@@ -27,3 +27,15 @@ node_modules
 # Resources folder but keep main contents
 src/main/resources/
 !src/main/*
+
+# Model cache files
+model_cache/
+*.npz
+*.pkl
+
+# macOS system files
+.DS_Store
+.AppleDouble
+.LSOverride
+Icon
+._*
