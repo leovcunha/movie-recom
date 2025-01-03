@@ -14,12 +14,21 @@ const RecommendationsPage = ({ onRate }) => {
   }, []);
 
   const fetchRecommendations = async () => {
+    console.log('Starting recommendations fetch...');
     try {
+      // Clear existing recommendations and show loading state
+      setRecommendations([]);
+      setLoading(true);
+      setError(null);
+      console.log('Cleared recommendations and set loading state');
+
       const userRatings = JSON.parse(localStorage.getItem('userRatings') || '{}');
+      console.log('Loaded user ratings:', userRatings);
       
       // Check if there are at least 5 ratings
       if (Object.keys(userRatings).length < 5) {
-        setRecommendations([]);
+        console.log('Less than 5 ratings, skipping fetch');
+        setLoading(false);
         return;
       }
 
@@ -28,12 +37,21 @@ const RecommendationsPage = ({ onRate }) => {
       Object.entries(userRatings).forEach(([key, value]) => {
         ratings[parseInt(key)] = parseFloat(value);
       });
+      console.log('Converted ratings:', ratings);
 
+      console.log('Making API request...');
       const response = await axios.post('/api/recommendations', {
         ratings: ratings
       });
+      console.log('Received response:', response.data);
 
-      setRecommendations(response.data);
+      // Filter out any movies that have been rated
+      const filteredRecommendations = response.data.filter(
+        movie => !ratings.hasOwnProperty(movie.id)
+      );
+      
+      setRecommendations(filteredRecommendations);
+      console.log('Updated recommendations after filtering:', filteredRecommendations);
     } catch (err) {
       console.error('Error fetching recommendations:', err);
       setError(err.response?.data?.detail || err.message);
@@ -83,14 +101,22 @@ const RecommendationsPage = ({ onRate }) => {
       <div className="recommendations-header">
         <h1>Your Personalized Recommendations</h1>
         <p>Based on your movie ratings</p>
-        {recommendations.length > 0 &&
-        <button 
-          className="btn btn-warning mb-3" 
-          onClick={handleReset}
-        >
-          Reset All Ratings
-        </button>
-        }
+        {recommendations.length > 0 && (
+          <>
+            <button 
+              className="btn btn-primary mb-3 me-2" 
+              onClick={fetchRecommendations}
+            >
+              Refresh Recommendations
+            </button>
+            <button 
+              className="btn btn-warning mb-3" 
+              onClick={handleReset}
+            >
+              Reset All Ratings
+            </button>
+          </>
+        )}
       </div>
       
       {recommendations.length > 0 ? (
