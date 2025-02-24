@@ -39,3 +39,6 @@ model_cache/
 .LSOverride
 Icon
 ._*
+
+# 
+*.parquet

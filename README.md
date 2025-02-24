@@ -19,6 +19,7 @@ The frontend is built with React and can be found in the `src/frontend` director
     - Install dependencies: `pip install -r requirements.txt`
     - Run the FastAPI server: `uvicorn src.main.python.app:app --reload`
     - API documentation available at: `http://localhost:8000/docs`
+    - download data from [here](https://drive.google.com/file/d/1KNHvgPM8HupZl6XNrd5in0Cw6WL3-5FW/view?usp=drive_link) into `src/backend/data` 
 
 2. **Frontend**
     - Navigate to frontend directory: `cd src/frontend`
