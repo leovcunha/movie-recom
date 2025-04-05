@@ -530,6 +530,39 @@ async def get_movie_details(movie_id: int):
         raise HTTPException(status_code=500, detail=str(e))
 
 
+@app.get("/api/movies/{movie_id}/videos")
+async def get_movie_videos(movie_id: int):
+    try:
+        async with aiohttp.ClientSession() as session:
+            url = f"https://api.themoviedb.org/3/movie/{movie_id}/videos"
+            params = {
+                "api_key": TMDB_API_KEY,
+                "language": "en-US"
+            }
+            
+            async with session.get(url, params=params) as response:
+                if response.status == 200:
+                    data = await response.json()
+                    
+                    # Filter for YouTube trailers (most common)
+                    trailers = [
+                        video for video in data.get('results', [])
+                        if video.get('site') == 'YouTube' and 
+                        (video.get('type') == 'Trailer' or video.get('type') == 'Teaser')
+                    ]
+                    
+                    # Return the first trailer, or an empty object if none found
+                    return {
+                        'results': trailers,
+                        'success': True
+                    }
+                    
+                raise HTTPException(status_code=response.status, detail=f"{response.status}: {response.reason}")
+    except Exception as e:
+        logger.error(f"Error getting movie videos: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+
 # Add at the top of the file with other constants
 GENRES = [
     28,     # Action & Adventure (will fetch both)

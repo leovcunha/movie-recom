@@ -24,9 +24,32 @@
   padding: 0 0.25rem;
 }
 
+/* Fixed movie card dimensions */
+.movie-card {
+  cursor: pointer;
+  transition: transform 0.3s ease, box-shadow 0.3s ease;
+  box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+  height: 100%;
+  width: 100%;
+  max-width: 220px;
+  margin: 0 auto;
+}
+
+/* Maintain DVD-like aspect ratio for movie posters */
+.movie-card .card-img-top {
+  aspect-ratio: 2/3;
+  object-fit: cover;
+  height: auto;
+  width: 100%;
+}
+
 @media (max-width: 768px) {
   .carousel-item .col {
     width: 33.33% !important; /* Force 3 items on tablet */
+  }
+  
+  .movie-card {
+    max-width: 180px;
   }
 }
 
@@ -40,9 +63,7 @@
   }
   
   .movie-card {
-    height: auto;
-    width: 100%;
-    margin: 0;
+    max-width: 160px;
   }
   
   .card-title {
@@ -51,15 +72,11 @@
     overflow: hidden;
     text-overflow: ellipsis;
   }
-  
-  .movie-card .card-img-top {
-    height: 168px !important;
-    object-fit: cover;
-  }
 }
 
 .movie-card:hover {
   transform: translateY(-5px);
+  box-shadow: 0 10px 15px rgba(0, 0, 0, 0.2);
 }
 
 .rating-container {

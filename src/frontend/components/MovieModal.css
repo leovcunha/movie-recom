@@ -1,0 +1,29 @@
+.movie-modal .modal-content {
+    background-color: #1a1a1a;
+    color: #fff;
+}
+
+.movie-modal .modal-header {
+    border-bottom: 1px solid #2d2d2d;
+}
+
+.movie-modal .modal-footer {
+    border-top: 1px solid #2d2d2d;
+}
+
+.movie-modal .close {
+    color: #fff;
+}
+
+.movie-poster {
+    border-radius: 8px;
+    box-shadow: 0 4px 8px rgba(0, 0, 0, 0.3);
+}
+
+.trailer-container {
+    margin-top: 20px;
+}
+
+.movie-modal .modal-title {
+    font-weight: 600;
+} 

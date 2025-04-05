@@ -1,12 +1,15 @@
 import React, { useState, useEffect } from 'react';
 import { Carousel, Row, Col, Card } from 'react-bootstrap';
 import StarRating from './StarRating';
+import MovieModal from './MovieModal';
 import './MovieCarousel.css';
 
 const MovieCarousel = ({ movies, title, onLoadMore, currentPage, totalPages, onRate }) => {
     const [currentSlide, setCurrentSlide] = useState(0);
     const [isLoading, setIsLoading] = useState(false);
     const [hasLoadedMore, setHasLoadedMore] = useState(false);
+    const [selectedMovie, setSelectedMovie] = useState(null);
+    const [showModal, setShowModal] = useState(false);
 
     // Calculate number of movies per slide based on screen size
     const getMoviesPerSlide = () => {
@@ -50,6 +53,15 @@ const MovieCarousel = ({ movies, title, onLoadMore, currentPage, totalPages, onR
         onRate(movieId, rating);
     };
 
+    const handleMovieClick = (movie) => {
+        setSelectedMovie(movie);
+        setShowModal(true);
+    };
+
+    const handleCloseModal = () => {
+        setShowModal(false);
+    };
+
     return (
         <div className="movie-section mb-5">
             <h2 className="mb-3">{title}</h2>
@@ -64,7 +76,10 @@ const MovieCarousel = ({ movies, title, onLoadMore, currentPage, totalPages, onR
                         <Row>
                             {group.map((movie) => (
                                 <Col key={movie.id} className="movie-col">
-                                    <Card className="movie-card h-100">
+                                    <Card 
+                                        className="movie-card h-100" 
+                                        onClick={() => handleMovieClick(movie)}
+                                    >
                                         <div className="position-relative">
                                             <Card.Img
                                                 variant="top"
@@ -74,7 +89,11 @@ const MovieCarousel = ({ movies, title, onLoadMore, currentPage, totalPages, onR
                                             <div className="rating-container">
                                                 <StarRating
                                                     initialRating={movie.userRating || 0}
-                                                    onRate={(rating) => handleRate(movie.id, rating)}
+                                                    onRate={(rating) => {
+                                                        handleRate(movie.id, rating);
+                                                        // Stop event propagation to prevent opening modal when rating
+                                                        event.stopPropagation();
+                                                    }}
                                                     size={24}
                                                 />
                                             </div>
@@ -89,6 +108,13 @@ const MovieCarousel = ({ movies, title, onLoadMore, currentPage, totalPages, onR
                     </Carousel.Item>
                 ))}
             </Carousel>
+            
+            <MovieModal 
+                show={showModal} 
+                onHide={handleCloseModal} 
+                movie={selectedMovie}
+                onRate={handleRate}
+            />
         </div>
     );
 };

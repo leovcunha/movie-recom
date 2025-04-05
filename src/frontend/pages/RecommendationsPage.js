@@ -1,7 +1,7 @@
 import React, { useEffect, useState } from 'react';
 import { Container, Alert, Row, Col, Card } from 'react-bootstrap';
 import StarRating from '../components/StarRating';
-import axios from 'axios';
+import { getRecommendations } from '../actions/getRecommendations';
 import './RecommendationsPage.css';
 
 const RecommendationsPage = ({ onRate }) => {
@@ -40,9 +40,7 @@ const RecommendationsPage = ({ onRate }) => {
       console.log('Converted ratings:', ratings);
 
       console.log('Making API request...');
-      const response = await axios.post('/api/recommendations', {
-        ratings: ratings
-      });
+      const response = await getRecommendations(ratings);
       console.log('Received response:', response.data);
 
       // Filter out any movies that have been rated
@@ -53,7 +51,7 @@ const RecommendationsPage = ({ onRate }) => {
       setRecommendations(filteredRecommendations);
       console.log('Updated recommendations after filtering:', filteredRecommendations);
     } catch (err) {
-      console.error('Error fetching recommendations:', err);
+      console.error('Error generating recommendations:', err);
       setError(err.response?.data?.detail || err.message);
     } finally {
       setLoading(false);

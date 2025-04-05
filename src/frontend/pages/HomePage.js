@@ -18,7 +18,7 @@ const HomePage = ({
     setNewReleases,
     setGenreMovies
 }) => (
-    <Container fluid>
+    <Container>
         {error && <div className="error alert alert-danger">{error}</div>}
         {isLoading ? (
             <div className="text-center my-5">
