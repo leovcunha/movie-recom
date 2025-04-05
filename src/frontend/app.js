@@ -208,7 +208,7 @@ const App = () => {
     return (
         <Router>
             <div className="app-container">
-                <Header showRecommendations={showRecommendations} />
+                <Header showRecommendations={showRecommendations} onRate={handleRate} />
                 <Routes>
                     <Route 
                         path="/" 

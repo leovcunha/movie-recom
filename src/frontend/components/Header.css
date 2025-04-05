@@ -16,6 +16,16 @@
   position: relative;
   color: rgba(255, 255, 255, 0.85) !important;
 }
+
+.search-container {
+  width: 100%;
+  max-width: 400px;
+}
+
+.mobile-search-container {
+  padding-bottom: 1rem;
+}
+
 @media (max-width: 768px) {
   .custom-navbar {
     padding: 0.5rem 0;
@@ -28,8 +38,6 @@
     margin: 0 0.5rem;
   }
 }
-
-
 
 .nav-item:hover {
   color: #fff !important;

@@ -573,6 +573,49 @@ GENRES = [
 ]
 
 
+@app.get("/api/movies/search")
+async def search_movies(query: str, page: int = 1):
+    try:
+        if not query or len(query.strip()) < 2:
+            return {"results": [], "page": 1, "total_pages": 0, "total_results": 0}
+            
+        async with aiohttp.ClientSession() as session:
+            url = "https://api.themoviedb.org/3/search/movie"
+            params = {
+                "api_key": TMDB_API_KEY,
+                "language": "en-US",
+                "query": query,
+                "page": str(page),
+                "include_adult": "false"
+            }
+            
+            async with session.get(url, params=params) as response:
+                if response.status == 200:
+                    data = await response.json()
+                    
+                    result = {
+                        'results': [{
+                            'id': movie['id'],
+                            'title': movie['title'],
+                            'overview': movie['overview'],
+                            'poster_path': movie['poster_path'],
+                            'backdrop_path': movie.get('backdrop_path'),
+                            'vote_average': movie['vote_average'],
+                            'release_date': movie.get('release_date', '')
+                        } for movie in data['results'] if movie.get('poster_path')],  # Filter out movies without posters
+                        'page': data['page'],
+                        'total_pages': data['total_pages'],
+                        'total_results': data['total_results']
+                    }
+                    
+                    return result
+                
+                raise HTTPException(status_code=response.status, detail=f"{response.status}: {response.reason}")
+    except Exception as e:
+        logger.error(f"Error searching movies: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+
 if __name__ == "__main__":
     import uvicorn
 
