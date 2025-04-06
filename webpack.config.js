@@ -30,9 +30,10 @@ module.exports = (env, argv) => {
                     vendor: {
                         test: /[\\/]node_modules[\\/]/,
                         name(module) {
-                            const packageName = module.context.match(
+                            const match = module.context?.match(
                                 /[\\/]node_modules[\\/](.*?)([\\/]|$)/
-                            )[1];
+                            );
+                            const packageName = match ? match[1] : 'unknown';
                             return `vendor.${packageName.replace('@', '')}`;
                         },
                     },
