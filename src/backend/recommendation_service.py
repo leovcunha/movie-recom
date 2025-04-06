@@ -151,7 +151,7 @@ class MovieRecommender:
             raise e
 
     def load_model(self):
-        """Load the trained model and its components."""
+        """Load the trained model and its components without loading the full parquet file."""
         try:
             # Load sparse matrices
             self.normalized_ratings = load_npz(
@@ -179,21 +179,26 @@ class MovieRecommender:
             self.movie_id_map = mappings['movie_id_map']
             self.reverse_movie_id_map = mappings['reverse_movie_id_map']
             
-            # Load ratings data
-            self.ratings_pl = pl.read_parquet(self.ratings_file)
-            
-            # Reconstruct movie_map and user_map from the mappings
+            # Create a minimal movie_map from the mappings instead of loading the full dataset
             self.movie_map = pl.DataFrame({
                 "tmdbId": list(self.movie_id_map.keys()),
                 "movie_idx": list(self.movie_id_map.values())
             })
             
+            # Store the movie_ids for later use
+            self.movie_ids = list(self.movie_id_map.keys())
+            
+            # Create lightweight user_map if needed
             self.user_map = pl.DataFrame({
                 "userId": list(self.user_id_map.keys()),
                 "user_idx": list(self.user_id_map.values())
             })
             
-            self.logger.info("Model loaded successfully")
+            # Set user_means from mappings
+            if 'user_means' in mappings:
+                self.user_means = pl.DataFrame(mappings['user_means'])
+            
+            self.logger.info("Model loaded successfully from cache without loading full dataset")
             
         except Exception as e:
             self.logger.error(f"Error loading model: {str(e)}")
@@ -365,16 +370,19 @@ class MovieRecommender:
     ) -> Dict[str, Dict[str, float]]:
         """
         Generate recommendations using both user-based and item-based collaborative filtering.
-        Also handles movies not found in the dataset by using API recommendations.
+        Memory-optimized version.
         """
         start_time = time.time()
         
         try:
+            # Import gc for garbage collection
+            import gc
+            
             # Track movies not found in our dataset
             missing_movies = []
             
-            # Initial setup and validation
-            temp_user = np.zeros(len(self.movie_id_map))
+            # Initial setup and validation - use float32 to save memory
+            temp_user = np.zeros(len(self.movie_id_map), dtype=np.float32)
             valid_ratings = []
             rated_movies = set()
             
@@ -396,61 +404,58 @@ class MovieRecommender:
             
             # If we have valid ratings in our dataset, use collaborative filtering
             if valid_ratings:
-                # Log normalization stats
+                # Normalize ratings using a simpler approach to save memory
                 user_mean = np.mean(valid_ratings)
-                user_std = np.std(valid_ratings)
-                global_mean = float(self.ratings_pl["rating"].mean())
-                global_std = float(self.ratings_pl["rating"].std())
-                self.logger.debug(f"User stats - mean: {user_mean:.2f}, std: {user_std:.2f}")
-                self.logger.debug(f"Global stats - mean: {global_mean:.2f}, std: {global_std:.2f}")
-                
-                # Normalize ratings
                 mask = temp_user != 0
-                if user_std > 0:
-                    temp_user[mask] = 0.7 * ((temp_user[mask] - user_mean) / user_std) + \
-                                    0.3 * ((temp_user[mask] - global_mean) / global_std)
-                else:
-                    temp_user[mask] = (temp_user[mask] - global_mean) / global_std
-                
-                # Log normalized ratings
-                self.logger.debug(f"Normalized ratings range: {temp_user[mask].min():.2f} to {temp_user[mask].max():.2f}")
+                temp_user[mask] -= user_mean
                 
                 # PART 1: USER-BASED COLLABORATIVE FILTERING
-                # Calculate similarities
-                similarities = cosine_similarity(temp_user.reshape(1, -1), self.normalized_ratings)[0]
+                # Calculate similarities more efficiently
+                similarities = np.zeros(self.normalized_ratings.shape[0], dtype=np.float32)
+                
+                # Process in smaller batches
+                batch_size = 1000
+                for i in range(0, self.normalized_ratings.shape[0], batch_size):
+                    end = min(i + batch_size, self.normalized_ratings.shape[0])
+                    batch_similarities = cosine_similarity(
+                        temp_user.reshape(1, -1), 
+                        self.normalized_ratings[i:end]
+                    )[0]
+                    similarities[i:end] = batch_similarities
                 
                 # Get top similar users
-                top_n = 50
-                top_user_indices = np.argsort(similarities)[-top_n:]
-                top_similarities = similarities[top_user_indices]
+                top_n = min(50, similarities.shape[0])
+                top_indices = np.argsort(similarities)[-top_n:]
+                top_sims = similarities[top_indices]
                 
-                # Log similarity stats
-                self.logger.debug(f"User similarity range: {similarities.min():.2f} to {similarities.max():.2f}")
-                self.logger.debug(f"Top 5 user similarities: {top_similarities[-5:]}")
+                # Clear similarities array to free memory
+                del similarities
+                gc.collect()
                 
-                # Generate predictions
-                weighted_sum = np.zeros(self.user_movie_matrix.shape[1])
-                similarity_sum = np.zeros(self.user_movie_matrix.shape[1])
+                # Generate predictions with memory efficiency
+                weighted_sum = np.zeros(self.user_movie_matrix.shape[1], dtype=np.float32)
+                similarity_sum = np.zeros(self.user_movie_matrix.shape[1], dtype=np.float32)
                 
-                for idx, sim in zip(top_user_indices, top_similarities):
+                # Process in batches
+                for idx, sim in zip(top_indices, top_sims):
                     if sim > 0:
                         user_ratings = self.user_movie_matrix[idx].toarray().flatten()
-                        weight = np.power(sim, 2)
+                        weight = sim ** 2
                         weighted_sum += weight * user_ratings
                         similarity_sum += weight * (user_ratings != 0)
                 
                 # Calculate predicted ratings
                 mask = similarity_sum > 0
-                user_based_predictions = np.zeros_like(weighted_sum)
+                user_based_predictions = np.zeros_like(weighted_sum, dtype=np.float32)
                 user_based_predictions[mask] = weighted_sum[mask] / similarity_sum[mask]
                 
                 # PART 2: ITEM-BASED COLLABORATIVE FILTERING - OPTIMIZED VERSION
-                item_based_predictions = np.zeros(len(self.movie_id_map))
+                item_based_predictions = np.zeros(len(self.movie_id_map), dtype=np.float32)
                 
                 # Get indices of rated movies
                 rated_indices = [self.movie_id_map[movie_id] for movie_id in rated_movies if movie_id in self.movie_id_map]
                 
-                # Use pre-calculated similarities for faster recommendations
+                # Use pre-calculated similarities with a limit of 20 similar movies instead of 50
                 if rated_indices:
                     # Find which rated movies are in our pre-calculated set
                     precalc_rated = [idx for idx in rated_indices if idx in self.top_similar_movies]
@@ -458,10 +463,10 @@ class MovieRecommender:
                     # For each rated movie that has pre-calculated similarities
                     for rated_idx in precalc_rated:
                         # Get the rating for this movie
-                        rating = temp_user[rated_idx]
+                        rating = temp_user[rated_idx] + user_mean  # Add back the mean
                         
-                        # Get its similar movies
-                        for similar_idx, similarity in self.top_similar_movies[rated_idx]:
+                        # Get its similar movies (limit to top 20 instead of all 50)
+                        for similar_idx, similarity in self.top_similar_movies[rated_idx][:20]:
                             # Skip if already rated
                             if similar_idx in rated_indices:
                                 continue
@@ -475,8 +480,7 @@ class MovieRecommender:
                 
                 # PART 3: COMBINE PREDICTIONS
                 # Combine user-based and item-based predictions with a weighted average
-                # We'll use a 60-40 split favoring item-based for more relevant recommendations
-                combined_predictions = np.zeros_like(user_based_predictions)
+                combined_predictions = np.zeros_like(user_based_predictions, dtype=np.float32)
                 
                 # Where both predictions exist
                 both_mask = (user_based_predictions > 0) & (item_based_predictions > 0)
@@ -490,27 +494,22 @@ class MovieRecommender:
                 item_only_mask = (user_based_predictions == 0) & (item_based_predictions > 0)
                 combined_predictions[item_only_mask] = item_based_predictions[item_only_mask]
                 
-                # Scale predictions while preserving relative differences
+                # Clear intermediate arrays to free memory
+                del user_based_predictions, item_based_predictions
+                gc.collect()
+                
+                # Scale predictions with a simpler approach
                 nonzero_mask = combined_predictions > 0
                 if nonzero_mask.any():
-                    # Get prediction statistics
-                    pred_min = combined_predictions[nonzero_mask].min()
-                    pred_max = combined_predictions[nonzero_mask].max()
-                    pred_mean = combined_predictions[nonzero_mask].mean()
-                    pred_std = combined_predictions[nonzero_mask].std()
-                    
-                    if pred_std > 0:
-                        # Use z-score transformation then scale to target range
-                        z_scores = (combined_predictions[nonzero_mask] - pred_mean) / pred_std
-                        # Scale to 3.5-5.0 range with sigmoid-like squashing
-                        scaled_ratings = 3.5 + 1.5 / (1 + np.exp(-z_scores))
-                        combined_predictions[nonzero_mask] = scaled_ratings
-                    else:
-                        # If no variation, scale linearly
+                    # Just scale to range 3.5-5.0 directly based on min/max
+                    min_val = combined_predictions[nonzero_mask].min()
+                    max_val = combined_predictions[nonzero_mask].max()
+                    if max_val > min_val:
                         combined_predictions[nonzero_mask] = 3.5 + 1.5 * (
-                            (combined_predictions[nonzero_mask] - pred_min) / 
-                            (pred_max - pred_min if pred_max > pred_min else 1)
+                            (combined_predictions[nonzero_mask] - min_val) / (max_val - min_val)
                         )
+                    else:
+                        combined_predictions[nonzero_mask] = 4.0  # Default mid-range value
                 
                 # Convert to recommendations
                 for idx, rating in enumerate(combined_predictions):
@@ -519,11 +518,9 @@ class MovieRecommender:
                         if movie_id not in rated_movies:
                             recommendations[str(movie_id)] = round(float(rating), 2)
                 
-                # Log final recommendations stats
-                self.logger.debug(f"Generated {len(recommendations)} recommendations above threshold")
-                if recommendations:
-                    ratings_list = list(recommendations.values())
-                    self.logger.debug(f"Final ratings range: {min(ratings_list):.2f} to {max(ratings_list):.2f}")
+                # Clear combined_predictions to free memory
+                del combined_predictions
+                gc.collect()
             
             # PART 4: API RECOMMENDATIONS FOR MISSING MOVIES
             # If we have missing movies or not enough recommendations, use API
@@ -556,7 +553,10 @@ class MovieRecommender:
         except Exception as e:
             self.logger.error(f"Error generating recommendations: {str(e)}")
             return {'recommendations': {}, 'error': str(e)}
-    
+        finally:
+            # Force garbage collection at the end
+            gc.collect()
+
     def get_api_recommendations(
         self, 
         missing_movies: List[int], 

@@ -12,6 +12,7 @@ from dotenv import load_dotenv
 from datetime import datetime, timedelta
 import aiohttp
 import asyncio
+import gc  # Add garbage collection
 
 # Load environment variables from .env file
 load_dotenv()
@@ -138,6 +139,8 @@ data_path = os.path.join(current_dir, "data", "ratings_tmdb.parquet")  # Changed
 # Initialize recommender once when starting the server
 try:
     recommender = MovieRecommender(data_path)
+    # Force garbage collection after loading model to free up memory
+    gc.collect()
 except Exception as e:
     logger.error(f"Failed to initialize recommender: {e}")
     raise
@@ -156,6 +159,9 @@ async def get_recommendations(preferences: UserPreferences):
         # Get recommendations from the model
         recommendations = recommender.get_recommendations(preferences.ratings)
         logger.debug(f"Raw recommendations from model: {recommendations}")
+        
+        # Force garbage collection after getting recommendations
+        gc.collect()
             
         # Check if movies exist in our dataset more accurately
         missing_movie_ids = []
@@ -192,33 +198,48 @@ async def get_recommendations(preferences: UserPreferences):
 
         # Fetch movie details for each recommendation
         recommended_movies = []
+        
+        # Process in smaller batches to prevent memory issues
+        batch_size = 10
+        all_items = list(recommendations['recommendations'].items())
+        
         async with aiohttp.ClientSession() as session:
-            tasks = []
-            for movie_id, predicted_rating in recommendations['recommendations'].items():
-                url = f"https://api.themoviedb.org/3/movie/{movie_id}"
-                params = {
-                    "api_key": TMDB_API_KEY,
-                    "language": "en-US"
-                }
-                tasks.append(session.get(url, params=params))
-            
-            responses = await asyncio.gather(*tasks)
-            for response, (movie_id, predicted_rating) in zip(responses, recommendations['recommendations'].items()):
-                if response.status == 200:
-                    movie_data = await response.json()
-                    recommended_movies.append({
-                        'id': int(movie_id),
-                        'title': movie_data['title'],
-                        'overview': movie_data['overview'],
-                        'poster_path': movie_data['poster_path'],
-                        'backdrop_path': movie_data['backdrop_path'],
-                        'predicted_rating': predicted_rating,
-                        'userRating': preferences.ratings.get(int(movie_id), 0)
-                    })
+            for i in range(0, len(all_items), batch_size):
+                batch = all_items[i:i+batch_size]
+                
+                tasks = []
+                for movie_id, predicted_rating in batch:
+                    url = f"https://api.themoviedb.org/3/movie/{movie_id}"
+                    params = {
+                        "api_key": TMDB_API_KEY,
+                        "language": "en-US"
+                    }
+                    tasks.append(session.get(url, params=params))
+                
+                responses = await asyncio.gather(*tasks)
+                
+                for response, (movie_id, predicted_rating) in zip(responses, batch):
+                    if response.status == 200:
+                        movie_data = await response.json()
+                        recommended_movies.append({
+                            'id': int(movie_id),
+                            'title': movie_data['title'],
+                            'overview': movie_data['overview'],
+                            'poster_path': movie_data['poster_path'],
+                            'backdrop_path': movie_data['backdrop_path'],
+                            'predicted_rating': predicted_rating,
+                            'userRating': preferences.ratings.get(int(movie_id), 0)
+                        })
+                
+                # Force garbage collection after each batch
+                gc.collect()
 
         # Sort by predicted rating
         recommended_movies.sort(key=lambda x: x['predicted_rating'], reverse=True)
 
+        # Force final garbage collection
+        gc.collect()
+        
         return recommended_movies
 
     except Exception as e:
