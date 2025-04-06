@@ -11,6 +11,12 @@ from datetime import datetime
 import requests
 import time
 from functools import lru_cache
+import gc
+try:
+    import psutil
+    HAVE_PSUTIL = True
+except ImportError:
+    HAVE_PSUTIL = False
 
 
 class MovieRecommender:
@@ -18,6 +24,10 @@ class MovieRecommender:
     A collaborative filtering-based movie recommendation system that uses both user-user similarity
     and item-item similarity to generate personalized movie recommendations.
     """
+
+    def _check_memory_optimization(self) -> bool:
+        """Check if extreme memory optimization is requested via environment variable."""
+        return os.environ.get("EXTREME_MEMORY_OPTIMIZATION", "0") == "1"
 
     def __init__(self, ratings_file: str):
         """
@@ -27,6 +37,9 @@ class MovieRecommender:
             ratings_file (str): Path to the Parquet file containing movie ratings
                               Expected format: userId,tmdbId,rating
         """
+        # Import garbage collection at the beginning
+        import gc
+        
         self.logger = logging.getLogger(__name__)
         self.model_dir = "model_cache"
         self.ratings_file = ratings_file
@@ -34,15 +47,29 @@ class MovieRecommender:
         self.api_cache = {}
         
         try:
+            # Force garbage collection before we start
+            gc.collect()
+            
             os.makedirs(self.model_dir, exist_ok=True)
             
-            # Load API cache if it exists
+            # Load API cache if it exists, but only if the file is not too large
             if os.path.exists(self.api_cache_file):
-                with open(self.api_cache_file, 'r') as f:
-                    self.api_cache = json.load(f)
+                # Check file size before loading
+                if os.path.getsize(self.api_cache_file) < 5 * 1024 * 1024:  # Only load if < 5MB
+                    with open(self.api_cache_file, 'r') as f:
+                        self.api_cache = json.load(f)
+                else:
+                    self.logger.warning("API cache too large, skipping load")
+                    self.api_cache = {}
+            
+            # Force garbage collection
+            gc.collect()
             
             # Check if we need to train a new model
             train_new_model = self.should_train_new_model()
+            
+            # Force garbage collection again
+            gc.collect()
             
             if train_new_model:
                 self.logger.info("Training new model...")
@@ -56,6 +83,8 @@ class MovieRecommender:
                 # Log minimal statistics to save memory
                 self.log_data_statistics(full_stats=False)
                 
+            # Force final garbage collection
+            gc.collect()    
             self.logger.info("MovieRecommender initialized successfully")
 
         except Exception as e:
@@ -157,17 +186,79 @@ class MovieRecommender:
             raise e
 
     def load_model(self):
-        """Load the trained model and its components without loading the full parquet file."""
+        """Load the trained model and its components with extreme memory optimization."""
         try:
-            import gc
+            # Force garbage collection before we start
+            gc.collect()
             
-            # Load mappings first since they're smaller
+            # Check if extreme memory optimization is requested
+            extreme_optimization = self._check_memory_optimization()
+            if extreme_optimization:
+                self.logger.warning("EXTREME memory optimization mode enabled")
+            
+            # Monitor memory if psutil is available
+            if HAVE_PSUTIL:
+                mem_before = psutil.Process().memory_info().rss / (1024 * 1024)
+                self.logger.info(f"Memory usage before loading model: {mem_before:.2f} MB")
+                # Check if we're already close to memory limits
+                mem_available = psutil.virtual_memory().available / (1024 * 1024)
+                low_memory_mode = mem_available < 100 or extreme_optimization  # If less than 100MB available or extreme mode
+                if low_memory_mode:
+                    self.logger.warning("Low memory detected - using extreme memory optimizations")
+            else:
+                low_memory_mode = extreme_optimization
+                
+            self.logger.info("Loading model with minimal memory footprint")
+            
+            # Step 1: Load only mappings first (smallest file)
             with open(os.path.join(self.model_dir, "mappings.pkl"), 'rb') as f:
                 mappings = pickle.load(f)
                 
+            # Create mappings but only keep essential information
             self.user_id_map = mappings['user_id_map']
             self.movie_id_map = mappings['movie_id_map']
             self.reverse_movie_id_map = mappings['reverse_movie_id_map']
+            
+            # Set user_means from mappings
+            if 'user_means' in mappings:
+                self.user_means = pl.DataFrame(mappings['user_means'])
+                
+            # Clear mappings to free memory
+            del mappings
+            gc.collect()
+            
+            if HAVE_PSUTIL:
+                mem_after_mappings = psutil.Process().memory_info().rss / (1024 * 1024)
+                self.logger.info(f"Memory after loading mappings: {mem_after_mappings:.2f} MB")
+            
+            # Step 2: Create lightweight dataframes from the mappings
+            # In extreme memory mode, limit to fewer movies
+            if extreme_optimization and len(self.movie_id_map) > 5000:
+                # Only keep top 5000 popular movies in extreme mode
+                self.logger.warning("Extreme optimization: Limiting to 5000 movies")
+                
+                # Load popularity to identify top movies
+                self.movie_popularity = np.load(os.path.join(self.model_dir, "movie_popularity.npy"))
+                
+                # Get indices of most popular movies
+                top_indices = np.argsort(self.movie_popularity)[-5000:]
+                
+                # Filter mappings to only keep popular movies
+                filtered_movie_id_map = {}
+                filtered_reverse_movie_id_map = {}
+                
+                for idx in top_indices:
+                    if idx in self.reverse_movie_id_map:
+                        movie_id = self.reverse_movie_id_map[idx]
+                        filtered_reverse_movie_id_map[idx] = movie_id
+                        filtered_movie_id_map[movie_id] = idx
+                
+                # Replace with filtered mappings
+                self.movie_id_map = filtered_movie_id_map
+                self.reverse_movie_id_map = filtered_reverse_movie_id_map
+                
+                # Force garbage collection
+                gc.collect()
             
             # Create a minimal movie_map from the mappings
             self.movie_map = pl.DataFrame({
@@ -178,60 +269,117 @@ class MovieRecommender:
             # Store the movie_ids for later use
             self.movie_ids = list(self.movie_id_map.keys())
             
-            # Create lightweight user_map
+            # Create lightweight user_map - limit users in extreme mode
+            if extreme_optimization and len(self.user_id_map) > 10000:
+                # Only keep 10000 random users in extreme mode
+                self.logger.warning("Extreme optimization: Limiting to 10000 users")
+                user_ids = list(self.user_id_map.keys())
+                np.random.seed(42)  # For reproducibility
+                selected_users = np.random.choice(user_ids, min(10000, len(user_ids)), replace=False)
+                self.user_id_map = {uid: self.user_id_map[uid] for uid in selected_users}
+            
             self.user_map = pl.DataFrame({
                 "userId": list(self.user_id_map.keys()),
                 "user_idx": list(self.user_id_map.values())
             })
             
-            # Set user_means from mappings
-            if 'user_means' in mappings:
-                self.user_means = pl.DataFrame(mappings['user_means'])
-            
-            # Clear mappings to free memory
-            del mappings
             gc.collect()
             
-            # Load movie popularity (smaller file)
-            self.movie_popularity = np.load(os.path.join(self.model_dir, "movie_popularity.npy"))
+            # Step 3: Load or reload movie popularity if we haven't already
+            if not hasattr(self, 'movie_popularity') or self.movie_popularity is None:
+                self.movie_popularity = np.load(os.path.join(self.model_dir, "movie_popularity.npy"))
             gc.collect()
             
-            # Load pre-calculated similarities for only the top 1000 most popular movies
+            if HAVE_PSUTIL:
+                mem_after_pop = psutil.Process().memory_info().rss / (1024 * 1024)
+                self.logger.info(f"Memory after loading popularity: {mem_after_pop:.2f} MB")
+            
+            # Step 4: Load pre-calculated similarities in chunks to save memory
             with open(os.path.join(self.model_dir, "top_similar_movies.pkl"), 'rb') as f:
-                full_similarities = pickle.load(f)
+                # Get indices of most popular movies - limit more if in low memory mode
+                max_movies = 200 if extreme_optimization else (500 if low_memory_mode else 1000)
+                top_indices = np.argsort(self.movie_popularity)[-max_movies:]
                 
-                # Get indices of top 1000 most popular movies
-                popular_indices = np.argsort(self.movie_popularity)[-1000:]
+                # Dictionary to store limited similar movies
+                self.top_similar_movies = {}
                 
-                # Only keep similarities for these popular movies
-                self.top_similar_movies = {
-                    idx: similarities[:20]  # Keep only top 20 similar movies for each
-                    for idx, similarities in full_similarities.items()
-                    if idx in popular_indices
-                }
+                # Load the full similarities
+                similarities = pickle.load(f)
+                
+                # Only keep similarities for top movies and only top similar movies
+                similar_limit = 3 if extreme_optimization else (5 if low_memory_mode else 10)
+                for idx in top_indices:
+                    if idx in similarities:
+                        self.top_similar_movies[idx] = similarities[idx][:similar_limit]
                 
                 # Clear full similarities to free memory
-                del full_similarities
+                del similarities
                 gc.collect()
             
-            # Load sparse matrices one by one with memory management
-            self.logger.info("Loading normalized ratings matrix...")
-            self.normalized_ratings = load_npz(
-                os.path.join(self.model_dir, "normalized_ratings.npz")
-            )
-            gc.collect()
+            if HAVE_PSUTIL:
+                mem_after_sim = psutil.Process().memory_info().rss / (1024 * 1024)
+                self.logger.info(f"Memory after loading similarities: {mem_after_sim:.2f} MB")
             
-            self.logger.info("Loading user-movie matrix...")
-            self.user_movie_matrix = load_npz(
-                os.path.join(self.model_dir, "user_movie_matrix.npz")
-            )
-            gc.collect()
+            # Step 5: Load matrices one at a time with memory management
+            # In extreme low memory mode, we might skip some matrices
             
-            self.logger.info("Loading movie-user matrix...")
-            self.movie_user_matrix = load_npz(
-                os.path.join(self.model_dir, "movie_user_matrix.npz")
-            )
-            gc.collect()
+            try:
+                # In extreme mode, we skip loading some matrices entirely
+                if extreme_optimization:
+                    self.logger.warning("Extreme optimization: Creating minimal sparse matrices")
+                    # Create minimal matrices
+                    shape = (len(self.user_id_map), len(self.movie_id_map))
+                    self.normalized_ratings = csr_matrix(shape)
+                    self.user_movie_matrix = csr_matrix(shape)
+                    self.movie_user_matrix = csr_matrix(shape)
+                else:
+                    self.logger.info("Loading normalized ratings matrix...")
+                    self.normalized_ratings = load_npz(
+                        os.path.join(self.model_dir, "normalized_ratings.npz")
+                    )
+                    gc.collect()
+                    
+                    if HAVE_PSUTIL:
+                        mem_ratings = psutil.Process().memory_info().rss / (1024 * 1024)
+                        self.logger.info(f"Memory after normalized ratings: {mem_ratings:.2f} MB")
+                    
+                    self.logger.info("Loading user-movie matrix...")
+                    self.user_movie_matrix = load_npz(
+                        os.path.join(self.model_dir, "user_movie_matrix.npz")
+                    )
+                    gc.collect()
+                    
+                    if HAVE_PSUTIL:
+                        mem_user = psutil.Process().memory_info().rss / (1024 * 1024)
+                        self.logger.info(f"Memory after user-movie matrix: {mem_user:.2f} MB")
+                    
+                    # Skip movie-user matrix if memory is already too high
+                    if HAVE_PSUTIL and mem_user > 400 and low_memory_mode:
+                        self.logger.warning("Memory usage too high, skipping movie-user matrix")
+                        # Create empty placeholder
+                        self.movie_user_matrix = csr_matrix((1, 1))
+                    else:
+                        self.logger.info("Loading movie-user matrix...")
+                        self.movie_user_matrix = load_npz(
+                            os.path.join(self.model_dir, "movie_user_matrix.npz")
+                        )
+                        gc.collect()
+            except Exception as e:
+                self.logger.error(f"Error loading matrices: {e}")
+                # Create empty matrices as fallback
+                shape = (len(self.user_id_map), len(self.movie_id_map))
+                self.normalized_ratings = csr_matrix(shape)
+                self.user_movie_matrix = csr_matrix(shape)
+                self.movie_user_matrix = csr_matrix(shape)
+            
+            if HAVE_PSUTIL:
+                mem_after = psutil.Process().memory_info().rss / (1024 * 1024)
+                self.logger.info(f"Final memory usage: {mem_after:.2f} MB")
+            
+            # Set flag to indicate we're in memory-optimized mode
+            self.memory_optimized = True
+            if extreme_optimization:
+                self.extreme_optimization = True
             
             self.logger.info("Model loaded successfully with memory optimizations")
             

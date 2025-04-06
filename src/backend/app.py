@@ -13,6 +13,11 @@ from datetime import datetime, timedelta
 import aiohttp
 import asyncio
 import gc  # Add garbage collection
+try:
+    import psutil
+    HAVE_PSUTIL = True
+except ImportError:
+    HAVE_PSUTIL = False
 import numpy as np
 
 # Load environment variables from .env file
@@ -142,23 +147,37 @@ async def read_root():
 
 # Update path to be relative to this file
 current_dir = os.path.dirname(os.path.abspath(__file__))
-data_path = os.path.join(current_dir, "data", "ratings_tmdb.parquet")
+data_path = os.path.join(current_dir, "data", "ratings_tmdb.parquet")  # Changed to parquet file
 
 # Initialize recommender once when starting the server
 try:
-    # Force garbage collection before loading the recommender
+    # Force garbage collection before loading
     gc.collect()
     
-    # Set a memory-efficient seed to ensure consistent results
-    np.random.seed(42)  # Set seed before initializing
+    # Monitor memory if available
+    if HAVE_PSUTIL:
+        mem_before = psutil.Process().memory_info().rss / (1024 * 1024)
+        mem_available = psutil.virtual_memory().available / (1024 * 1024)
+        logger.info(f"Memory before loading recommender: {mem_before:.2f} MB, Available: {mem_available:.2f} MB")
+        
+        # Set environment variable for extreme memory optimization if needed
+        if mem_available < 100:  # Less than 100MB available
+            os.environ["EXTREME_MEMORY_OPTIMIZATION"] = "1"
+            logger.warning("Setting EXTREME_MEMORY_OPTIMIZATION=1 due to low available memory")
     
-    logger.info("Loading recommender system...")
+    # Initialize recommender
+    logger.info("Loading movie recommender...")
     recommender = MovieRecommender(data_path)
     
-    # Force garbage collection after loading model
+    # Force garbage collection after loading model to free up memory
     gc.collect()
     
-    logger.info("Recommender system loaded successfully")
+    # Log memory after loading
+    if HAVE_PSUTIL:
+        mem_after = psutil.Process().memory_info().rss / (1024 * 1024)
+        logger.info(f"Memory after loading recommender: {mem_after:.2f} MB")
+    
+    logger.info("Recommender loaded successfully")
 except Exception as e:
     logger.error(f"Failed to initialize recommender: {e}")
     raise
