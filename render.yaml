@@ -1,0 +1,21 @@
+services:
+  - type: web
+    name: movie-recommendation
+    env: docker
+    repo: https://github.com/your-username/movie-recom # Replace with your actual GitHub repo URL
+    region: oregon # Choose based on your preference (options: oregon, frankfurt, singapore, ohio)
+    plan: free # You can change to a paid plan if needed
+    branch: main # Use your main branch name
+    envVars:
+      - key: TMDB_API_KEY
+        sync: false # This ensures that the API key isn't stored in the render.yaml file
+      - key: ENV
+        value: production
+    buildFilter:
+      paths:
+        - src/**
+        - package*.json
+        - requirements.txt
+        - Dockerfile
+        - render-build.sh
+    healthCheckPath: /health 
