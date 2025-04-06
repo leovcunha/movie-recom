@@ -35,15 +35,12 @@ app.add_middleware(
 
 # Mount static files only in production
 if ENV == "production":
-    # Define paths relative to the current file's location
-    current_dir = os.path.dirname(os.path.abspath(__file__))
-    project_root = os.path.dirname(os.path.dirname(current_dir))
-    
-    # Path to webpack output directory
-    static_path = os.path.join(project_root, "src", "main", "resources", "static")
-    
     # Debug logging
     logger.debug(f"Current working directory: {os.getcwd()}")
+    
+    # Use the static directory where Dockerfile copied files
+    static_path = "static"
+    
     logger.debug(f"Static path: {static_path}")
     logger.debug(f"Static directory exists: {os.path.exists(static_path)}")
     if os.path.exists(static_path):
@@ -121,12 +118,8 @@ async def read_root():
         if ENV == "production":
             logger.debug("Attempting to serve index.html")
             
-            # Using the same path resolution strategy
-            current_dir = os.path.dirname(os.path.abspath(__file__))
-            project_root = os.path.dirname(os.path.dirname(current_dir))
-            
-            # Path to the index.html file produced by webpack
-            index_path = os.path.join(project_root, "src", "main", "resources", "static", "index.html")
+            # Direct path to index.html based on Dockerfile
+            index_path = "static/index.html"
             
             logger.debug(f"Index path: {index_path}")
             logger.debug(f"Index file exists: {os.path.exists(index_path)}")
