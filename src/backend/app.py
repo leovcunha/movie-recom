@@ -13,6 +13,7 @@ from datetime import datetime, timedelta
 import aiohttp
 import asyncio
 import gc  # Add garbage collection
+import numpy as np
 
 # Load environment variables from .env file
 load_dotenv()
@@ -56,8 +57,9 @@ app.movie_cache = {}
 
 # Add this function to prefetch genre data
 async def prefetch_genre_data():
-    genres = [28, 12, 35, 18, 10751, 10749]  # Your genre IDs
-    timeout = aiohttp.ClientTimeout(total=10)  # Add timeout
+    # Limit to just 3 genres to save memory
+    genres = [28, 35, 18]  # Action, Comedy, Drama
+    timeout = aiohttp.ClientTimeout(total=10)
     try:
         async with aiohttp.ClientSession(timeout=timeout) as session:
             tasks = []
@@ -76,6 +78,7 @@ async def prefetch_genre_data():
                 tasks.append(session.get(url, params=params))
             
             responses = await asyncio.gather(*tasks, return_exceptions=True)
+            
             for genre_id, response in zip(genres, responses):
                 if isinstance(response, Exception):
                     logger.error(f"Error prefetching genre {genre_id}: {response}")
@@ -84,21 +87,26 @@ async def prefetch_genre_data():
                 if response.status == 200:
                     data = await response.json()
                     cache_key = f"genre_{genre_id}_page_1"
-                    app.movie_cache[cache_key] = {
-                        'results': [{
+                    
+                    # Only take first 10 movies and just essential fields to save memory
+                    results = []
+                    for movie in data.get('results', [])[:10]:
+                        results.append({
                             'id': movie['id'],
                             'title': movie['title'],
-                            'overview': movie['overview'],
-                            'poster_path': movie['poster_path'],
-                            'backdrop_path': movie['backdrop_path'],
-                            'vote_average': movie['vote_average'],
-                            'release_date': movie['release_date'],
-                            'genre_ids': movie['genre_ids']
-                        } for movie in data['results']],
+                            'poster_path': movie.get('poster_path', ''),
+                            'vote_average': movie.get('vote_average', 0)
+                        })
+                    
+                    app.movie_cache[cache_key] = {
+                        'results': results,
                         'page': data['page'],
                         'total_pages': data['total_pages'],
                         'total_results': data['total_results']
                     }
+                    
+                    # Force garbage collection after processing each genre
+                    gc.collect()
     except Exception as e:
         logger.error(f"Error in prefetch_genre_data: {e}")
         # Don't let startup fail if prefetch fails
@@ -134,13 +142,23 @@ async def read_root():
 
 # Update path to be relative to this file
 current_dir = os.path.dirname(os.path.abspath(__file__))
-data_path = os.path.join(current_dir, "data", "ratings_tmdb.parquet")  # Changed to parquet file
+data_path = os.path.join(current_dir, "data", "ratings_tmdb.parquet")
 
 # Initialize recommender once when starting the server
 try:
-    recommender = MovieRecommender(data_path)
-    # Force garbage collection after loading model to free up memory
+    # Force garbage collection before loading the recommender
     gc.collect()
+    
+    # Set a memory-efficient seed to ensure consistent results
+    np.random.seed(42)  # Set seed before initializing
+    
+    logger.info("Loading recommender system...")
+    recommender = MovieRecommender(data_path)
+    
+    # Force garbage collection after loading model
+    gc.collect()
+    
+    logger.info("Recommender system loaded successfully")
 except Exception as e:
     logger.error(f"Failed to initialize recommender: {e}")
     raise
@@ -246,10 +264,11 @@ async def get_recommendations(preferences: UserPreferences):
         logger.error(f"Error in recommendations endpoint: {e}")
         raise HTTPException(status_code=500, detail=str(e))
 
-async def fetch_similar_movies_from_tmdb(movie_ids: list[int], n: int = 5) -> Dict[int, list]:
+async def fetch_similar_movies_from_tmdb(movie_ids: list[int], n: int = 3) -> Dict[int, list]:
     """
-    Fetches similar movies from TMDB for a list of movie IDs, filtered to be within ±3 years of the original movie's release year
-    and with a minimum rating of 3.5.
+    Fetches similar movies from TMDB for a list of movie IDs, filtered to be within ±3 years 
+    of the original movie's release year and with a minimum rating of 3.5.
+    Optimized for lower memory usage.
 
     Args:
         movie_ids (list[int]): List of movie IDs for which to find similar movies.
@@ -258,6 +277,9 @@ async def fetch_similar_movies_from_tmdb(movie_ids: list[int], n: int = 5) -> Di
     Returns:
         Dict[int, list]: Dictionary of {movie_id: list of similar movies}
     """
+    # Process at most 3 movies to save memory
+    movie_ids = movie_ids[:3]
+    
     similar_movies_dict = {}
     async with aiohttp.ClientSession() as session:
         for movie_id in movie_ids:
@@ -272,13 +294,11 @@ async def fetch_similar_movies_from_tmdb(movie_ids: list[int], n: int = 5) -> Di
                     if response.status == 200:
                         movie_data = await response.json()
                         release_date = movie_data.get('release_date', '')
+                        
                         if release_date:
                             release_year = int(release_date[:4])
                             min_year = release_year - 3
                             max_year = release_year + 3
-                            
-                            # Log original movie details
-                            logger.info(f"Fetching similar movies for: {movie_data['title']} ({release_year})")
                             
                             # Now get similar movies
                             url = f"https://api.themoviedb.org/3/movie/{movie_id}/similar"
@@ -290,36 +310,38 @@ async def fetch_similar_movies_from_tmdb(movie_ids: list[int], n: int = 5) -> Di
                             async with session.get(url, params=params) as similar_response:
                                 if similar_response.status == 200:
                                     data = await similar_response.json()
-                                    # Filter similar movies by release year and rating
-                                    similar_movies = [
-                                        movie for movie in data.get('results', [])
-                                        if movie.get('release_date', '') and 
-                                        min_year <= int(movie['release_date'][:4]) <= max_year and
-                                        movie.get('vote_average', 0)/2 >= 3.5
-                                    ][:n]
                                     
-                                    # Log similar movies found
-                                    logger.info(f"Found {len(similar_movies)} similar movies for {movie_data['title']}")
-                                    for sm in similar_movies:
-                                        logger.debug(f"Similar movie: {sm['title']} ({sm['release_date'][:4]}) - Rating: {sm['vote_average']}")
+                                    # Filter similar movies efficiently with list comprehension
+                                    similar_movies = []
+                                    for movie in data.get('results', [])[:10]:  # Only check first 10 movies
+                                        if (movie.get('release_date', '') and 
+                                            min_year <= int(movie['release_date'][:4]) <= max_year and
+                                            movie.get('vote_average', 0)/2 >= 3.5):
+                                            # Only include essential fields
+                                            similar_movies.append({
+                                                'id': movie['id'],
+                                                'title': movie['title'],
+                                                'vote_average': movie['vote_average'],
+                                                'release_date': movie['release_date'][:4]
+                                            })
+                                            
+                                            # Break early if we have enough movies
+                                            if len(similar_movies) >= n:
+                                                break
                                     
                                     similar_movies_dict[movie_id] = similar_movies
                                 else:
-                                    logger.error(f"Error fetching similar movies for {movie_id}: {similar_response.status} - {similar_response.reason}")
                                     similar_movies_dict[movie_id] = []
                         else:
-                            logger.error(f"Could not get release date for movie {movie_id}")
                             similar_movies_dict[movie_id] = []
                     else:
-                        logger.error(f"Error fetching movie details for {movie_id}: {response.status} - {response.reason}")
                         similar_movies_dict[movie_id] = []
             except Exception as e:
                 logger.error(f"Error fetching similar movies for {movie_id}: {e}")
                 similar_movies_dict[movie_id] = []
-    
-    # Log total similar movies found across all input movies
-    total_similar = sum(len(movies) for movies in similar_movies_dict.values())
-    logger.info(f"Found {total_similar} similar movies across {len(movie_ids)} input movies")
+                
+            # Force garbage collection after processing each movie
+            gc.collect()
     
     return similar_movies_dict
 
@@ -337,13 +359,18 @@ async def get_valid_movies():
         if hasattr(app, 'valid_movies_cache'):
             return app.valid_movies_cache
 
-        # If not in cache, fetch and process
-        all_movie_ids = [int(id) for id in recommender.movie_ids]
-        popular_movies = recommender.get_popular_movies(20)
+        # If not in cache, create a minimal response
+        all_movie_ids = recommender.movie_ids[:50]  # Just get first 50 IDs instead of all
+        
+        # Get popular movies but limit to just 10
+        popular_movies = recommender.get_popular_movies(10)
 
+        # Process only a few movies to save memory
+        movie_sample = list(popular_movies.keys())[:5]  # Just 5 movies for sample
+        
         async with aiohttp.ClientSession() as session:
             tasks = []
-            for movie_id in popular_movies.keys():
+            for movie_id in movie_sample:
                 url = f"https://api.themoviedb.org/3/movie/{movie_id}"
                 params = {
                     "api_key": TMDB_API_KEY,
@@ -353,30 +380,32 @@ async def get_valid_movies():
             
             responses = await asyncio.gather(*tasks)
             movies_data = []
+            
             for response in responses:
                 if response.status == 200:
                     movie_data = await response.json()
+                    # Only include essential fields
                     movies_data.append({
                         'id': movie_data['id'],
                         'title': movie_data['title'],
-                        'overview': movie_data['overview'],
                         'poster_path': movie_data['poster_path'],
-                        'backdrop_path': movie_data['backdrop_path'],
-                        'vote_average': movie_data['vote_average'],
-                        'release_date': movie_data['release_date'],
-                        'genre_ids': movie_data.get('genres', [])
+                        'vote_average': movie_data['vote_average']
                     })
 
         result = {
-            "total_movies": len(all_movie_ids),
-            "id_range": f"{min(all_movie_ids)} to {max(all_movie_ids)}",
-            "popular_movies": {int(k): float(v) for k, v in popular_movies.items()},
-            "sample_ids": [int(id) for id in all_movie_ids[:50]],
+            "total_movies": len(recommender.movie_ids),
+            "id_range": f"{min(recommender.movie_ids)} to {max(recommender.movie_ids)}",
+            "popular_movies": {int(k): int(v) for k, v in list(popular_movies.items())[:10]},
+            "sample_ids": [int(id) for id in all_movie_ids],
             "movie_details": movies_data
         }
 
         # Cache the result
         app.valid_movies_cache = result
+        
+        # Force garbage collection
+        gc.collect()
+        
         return result
     except Exception as e:
         logger.error(f"Error getting valid movies: {e}")

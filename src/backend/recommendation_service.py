@@ -41,15 +41,21 @@ class MovieRecommender:
                 with open(self.api_cache_file, 'r') as f:
                     self.api_cache = json.load(f)
             
-            if self.should_train_new_model():
+            # Check if we need to train a new model
+            train_new_model = self.should_train_new_model()
+            
+            if train_new_model:
                 self.logger.info("Training new model...")
                 self.train_model()
                 self.save_model()
+                # Only log full statistics if we're training a new model
+                self.log_data_statistics(full_stats=True)
             else:
                 self.logger.info("Loading cached model...")
                 self.load_model()
+                # Log minimal statistics to save memory
+                self.log_data_statistics(full_stats=False)
                 
-            self.log_data_statistics()
             self.logger.info("MovieRecommender initialized successfully")
 
         except Exception as e:
@@ -153,25 +159,9 @@ class MovieRecommender:
     def load_model(self):
         """Load the trained model and its components without loading the full parquet file."""
         try:
-            # Load sparse matrices
-            self.normalized_ratings = load_npz(
-                os.path.join(self.model_dir, "normalized_ratings.npz")
-            )
-            self.user_movie_matrix = load_npz(
-                os.path.join(self.model_dir, "user_movie_matrix.npz")
-            )
-            self.movie_user_matrix = load_npz(
-                os.path.join(self.model_dir, "movie_user_matrix.npz")
-            )
+            import gc
             
-            # Load movie popularity
-            self.movie_popularity = np.load(os.path.join(self.model_dir, "movie_popularity.npy"))
-            
-            # Load pre-calculated similarities
-            with open(os.path.join(self.model_dir, "top_similar_movies.pkl"), 'rb') as f:
-                self.top_similar_movies = pickle.load(f)
-            
-            # Load mappings and other data
+            # Load mappings first since they're smaller
             with open(os.path.join(self.model_dir, "mappings.pkl"), 'rb') as f:
                 mappings = pickle.load(f)
                 
@@ -179,7 +169,7 @@ class MovieRecommender:
             self.movie_id_map = mappings['movie_id_map']
             self.reverse_movie_id_map = mappings['reverse_movie_id_map']
             
-            # Create a minimal movie_map from the mappings instead of loading the full dataset
+            # Create a minimal movie_map from the mappings
             self.movie_map = pl.DataFrame({
                 "tmdbId": list(self.movie_id_map.keys()),
                 "movie_idx": list(self.movie_id_map.values())
@@ -188,7 +178,7 @@ class MovieRecommender:
             # Store the movie_ids for later use
             self.movie_ids = list(self.movie_id_map.keys())
             
-            # Create lightweight user_map if needed
+            # Create lightweight user_map
             self.user_map = pl.DataFrame({
                 "userId": list(self.user_id_map.keys()),
                 "user_idx": list(self.user_id_map.values())
@@ -198,7 +188,52 @@ class MovieRecommender:
             if 'user_means' in mappings:
                 self.user_means = pl.DataFrame(mappings['user_means'])
             
-            self.logger.info("Model loaded successfully from cache without loading full dataset")
+            # Clear mappings to free memory
+            del mappings
+            gc.collect()
+            
+            # Load movie popularity (smaller file)
+            self.movie_popularity = np.load(os.path.join(self.model_dir, "movie_popularity.npy"))
+            gc.collect()
+            
+            # Load pre-calculated similarities for only the top 1000 most popular movies
+            with open(os.path.join(self.model_dir, "top_similar_movies.pkl"), 'rb') as f:
+                full_similarities = pickle.load(f)
+                
+                # Get indices of top 1000 most popular movies
+                popular_indices = np.argsort(self.movie_popularity)[-1000:]
+                
+                # Only keep similarities for these popular movies
+                self.top_similar_movies = {
+                    idx: similarities[:20]  # Keep only top 20 similar movies for each
+                    for idx, similarities in full_similarities.items()
+                    if idx in popular_indices
+                }
+                
+                # Clear full similarities to free memory
+                del full_similarities
+                gc.collect()
+            
+            # Load sparse matrices one by one with memory management
+            self.logger.info("Loading normalized ratings matrix...")
+            self.normalized_ratings = load_npz(
+                os.path.join(self.model_dir, "normalized_ratings.npz")
+            )
+            gc.collect()
+            
+            self.logger.info("Loading user-movie matrix...")
+            self.user_movie_matrix = load_npz(
+                os.path.join(self.model_dir, "user_movie_matrix.npz")
+            )
+            gc.collect()
+            
+            self.logger.info("Loading movie-user matrix...")
+            self.movie_user_matrix = load_npz(
+                os.path.join(self.model_dir, "movie_user_matrix.npz")
+            )
+            gc.collect()
+            
+            self.logger.info("Model loaded successfully with memory optimizations")
             
         except Exception as e:
             self.logger.error(f"Error loading model: {str(e)}")
@@ -337,7 +372,7 @@ class MovieRecommender:
 
     def get_popular_movies(self, n: int = 20) -> Dict[int, int]:
         """
-        Get the most viewed movies.
+        Get the most viewed movies based on the cached movie_popularity array.
 
         Args:
             n (int): Number of popular movies to return
@@ -345,25 +380,26 @@ class MovieRecommender:
         Returns:
             Dict[int, int]: Dictionary of {tmdb_id: view_count}
         """
-        # Use the already loaded ratings data
-        movie_views = self.ratings_pl.groupby("tmdbId").agg(
-            pl.count().alias("count")
-        ).sort("count", descending=True)
-        
-        # Get top N movies
-        top_movies = movie_views.limit(n)
-
-        # Convert to dictionary
-        popular_movies = {
-            int(row["tmdbId"]): int(row["count"]) 
-            for row in top_movies.iter_rows(named=True)
-        }
-
-        # Add debug logging
-        self.logger.debug(f"Found {len(popular_movies)} popular movies")
-        self.logger.debug(f"Sample of popular movies: {dict(list(popular_movies.items())[:5])}")
-
-        return popular_movies
+        try:
+            # Get indices of top N popular movies
+            top_indices = np.argsort(self.movie_popularity)[-n:][::-1]  # Reverse to get descending order
+            
+            # Create dictionary mapping tmdb_id to popularity
+            popular_movies = {}
+            for idx in top_indices:
+                if idx in self.reverse_movie_id_map:
+                    tmdb_id = self.reverse_movie_id_map[idx]
+                    view_count = int(self.movie_popularity[idx])
+                    popular_movies[tmdb_id] = view_count
+            
+            self.logger.debug(f"Found {len(popular_movies)} popular movies from cached data")
+            
+            return popular_movies
+            
+        except Exception as e:
+            self.logger.error(f"Error getting popular movies: {e}")
+            # Fallback to an empty dictionary if there's an error
+            return {}
 
     def get_recommendations(
         self, user_preferences: Dict[int, float], n_recommendations: int = 10
@@ -689,29 +725,35 @@ class MovieRecommender:
             self.logger.error(f"Error getting API recommendations: {str(e)}")
             return {}
 
-    def log_data_statistics(self):
+    def log_data_statistics(self, full_stats=False):
         """
         Log important statistics about the loaded dataset for monitoring and debugging.
+        
+        Args:
+            full_stats (bool): Whether to log full statistics (requires loading dataset)
         """
-        # Make sure we have ratings data
-        if not hasattr(self, 'ratings_pl'):
-            self.ratings_pl = pl.read_parquet(self.ratings_file)
-        
-        self.logger.info(f"Total number of ratings: {len(self.ratings_pl)}")
-        self.logger.info(f"Number of unique movies: {len(self.movie_id_map)}")
-        self.logger.info(f"Number of unique users: {len(self.user_id_map)}")
-        
-        # Get movie ID range
-        min_movie_id = self.movie_map["tmdbId"].min()
-        max_movie_id = self.movie_map["tmdbId"].max()
-        self.logger.info(f"Movie ID range: {min_movie_id} to {max_movie_id}")
-        
-        # Rating statistics
-        rating_stats = self.ratings_pl.select(
-            pl.col("rating").mean().alias("mean"),
-            pl.col("rating").std().alias("std"),
-            pl.col("rating").min().alias("min"),
-            pl.col("rating").max().alias("max"),
-            pl.col("rating").median().alias("median")
-        )
-        self.logger.info(f"Rating statistics:\n{rating_stats}")
+        try:
+            # Log basic statistics from loaded model
+            self.logger.info(f"Number of unique movies: {len(self.movie_id_map)}")
+            self.logger.info(f"Number of unique users: {len(self.user_id_map)}")
+            
+            # Get movie ID range
+            min_movie_id = min(self.movie_id_map.keys())
+            max_movie_id = max(self.movie_id_map.keys())
+            self.logger.info(f"Movie ID range: {min_movie_id} to {max_movie_id}")
+            
+            # Only log full statistics if requested and training a new model
+            if full_stats and hasattr(self, 'ratings_pl'):
+                # Rating statistics
+                rating_stats = self.ratings_pl.select(
+                    pl.col("rating").mean().alias("mean"),
+                    pl.col("rating").std().alias("std"),
+                    pl.col("rating").min().alias("min"),
+                    pl.col("rating").max().alias("max"),
+                    pl.col("rating").median().alias("median")
+                )
+                self.logger.info(f"Rating statistics:\n{rating_stats}")
+                self.logger.info(f"Total number of ratings: {len(self.ratings_pl)}")
+        except Exception as e:
+            self.logger.error(f"Error logging data statistics: {e}")
+            # Don't let this error propagate
