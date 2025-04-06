@@ -35,14 +35,23 @@ app.add_middleware(
 
 # Mount static files only in production
 if ENV == "production":
-    # Debug: Print current directory and contents
+    # Define paths relative to the current file's location
+    current_dir = os.path.dirname(os.path.abspath(__file__))
+    project_root = os.path.dirname(os.path.dirname(current_dir))
+    
+    # Path to webpack output directory
+    static_path = os.path.join(project_root, "src", "main", "resources", "static")
+    
+    # Debug logging
     logger.debug(f"Current working directory: {os.getcwd()}")
-    logger.debug(f"Directory contents: {os.listdir('.')}")
-    logger.debug(f"Static directory contents: {os.listdir('static') if os.path.exists('static') else 'static directory not found'}")
-
+    logger.debug(f"Static path: {static_path}")
+    logger.debug(f"Static directory exists: {os.path.exists(static_path)}")
+    if os.path.exists(static_path):
+        logger.debug(f"Static directory contents: {os.listdir(static_path)}")
+    
     # Mount static files
-    app.mount("/built", StaticFiles(directory="static/built"), name="built")
-    app.mount("/static", StaticFiles(directory="static"), name="static")
+    app.mount("/built", StaticFiles(directory=os.path.join(static_path, "built")), name="built")
+    app.mount("/static", StaticFiles(directory=static_path), name="static")
 
 # Add at the start of your file, after creating the FastAPI app
 app.movie_cache = {}
@@ -111,7 +120,18 @@ async def read_root():
     try:
         if ENV == "production":
             logger.debug("Attempting to serve index.html")
-            return FileResponse('static/index.html')
+            
+            # Using the same path resolution strategy
+            current_dir = os.path.dirname(os.path.abspath(__file__))
+            project_root = os.path.dirname(os.path.dirname(current_dir))
+            
+            # Path to the index.html file produced by webpack
+            index_path = os.path.join(project_root, "src", "main", "resources", "static", "index.html")
+            
+            logger.debug(f"Index path: {index_path}")
+            logger.debug(f"Index file exists: {os.path.exists(index_path)}")
+            
+            return FileResponse(index_path)
         else:
             return {"message": "API running in development mode"}
     except Exception as e:
