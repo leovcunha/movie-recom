@@ -12,12 +12,7 @@ jobs:
     steps:
     - name: Checkout code
       uses: actions/checkout@v3
-      
-    - name: Make render-build.sh executable
-      run: |
-        chmod +x render-build.sh
-        git update-index --chmod=+x render-build.sh
-    
+          
     - name: Deploy to Render
       uses: JorgeLNJunior/render-deploy@v1.4.3
       with:

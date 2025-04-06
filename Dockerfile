@@ -17,12 +17,14 @@ WORKDIR /app
 RUN apt-get update && \
     apt-get install -y --no-install-recommends \
     build-essential \
+    python3-pip \
     && apt-get clean \
     && rm -rf /var/lib/apt/lists/*
 
 # Copy Python requirements and install dependencies
 COPY requirements.txt .
 RUN pip install --no-cache-dir -r requirements.txt
+RUN pip install gdown
 
 # Create static directory and copy the built frontend
 WORKDIR /app
@@ -34,6 +36,9 @@ RUN echo "Contents of static:" && ls -la static/
 
 # Copy backend code
 COPY src/backend ./
+RUN mkdir -p data && \
+    gdown --id 1KNHvgPM8HupZl6XNrd5in0Cw6WL3-5FW -O data/ratings_tmdb.parquet && \
+    ls -la data/
 
 # Set environment variables
 ENV PYTHONPATH=/app
