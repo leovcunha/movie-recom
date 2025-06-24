@@ -46,7 +46,7 @@ if ENV == "production":
     logger.debug(f"Current working directory: {os.getcwd()}")
     
     # Use the static directory where Dockerfile copied files
-    static_path = "static"
+    static_path = "/app/static"
     
     logger.debug(f"Static path: {static_path}")
     logger.debug(f"Static directory exists: {os.path.exists(static_path)}")
@@ -54,7 +54,6 @@ if ENV == "production":
         logger.debug(f"Static directory contents: {os.listdir(static_path)}")
     
     # Mount static files
-    app.mount("/built", StaticFiles(directory=os.path.join(static_path, "built")), name="built")
     app.mount("/static", StaticFiles(directory=static_path), name="static")
 
 # Add at the start of your file, after creating the FastAPI app

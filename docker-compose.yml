@@ -1,15 +1,9 @@
+version: '3.8' # It's good practice to add a version
+
 services:
   app:
-    build:
-      context: .
-      dockerfile: Dockerfile
+    build: . # This tells Docker to find and use Dockerfile
     ports:
       - "8000:8000"
-    volumes:
-      - ./src:/app/src
-      - ./static:/app/static
-    environment:
-      - PYTHONPATH=/app
-      - PORT=8000
-      - ENVIRONMENT=development
-    command: uvicorn app:app --host 0.0.0.0 --port 8000 --reload 
+    # No volumes, no command override. 
+    # The image is self-contained and uses the CMD from the Dockerfile.
