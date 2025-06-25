@@ -1,9 +1,9 @@
-version: '3.8' # It's good practice to add a version
-
+# This should be the content of your docker-compose.yml
+version: '3.8'
 services:
   app:
-    build: . # This tells Docker to find and use Dockerfile
+    build: .
     ports:
       - "8000:8000"
-    # No volumes, no command override. 
-    # The image is self-contained and uses the CMD from the Dockerfile.
+    volumes:
+      - ./src/backend/model_cache:/app/src/backend/model_cache
