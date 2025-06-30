@@ -324,15 +324,16 @@ class MovieRecommender:
             # In extreme low memory mode, we might skip some matrices
             
             try:
-                # In extreme mode, we skip loading some matrices entirely
-                if extreme_optimization:
-                    self.logger.warning("Extreme optimization: Creating minimal sparse matrices")
-                    # Create minimal matrices
+                # In low memory mode, we skip loading matrices entirely to prevent crashes
+                if low_memory_mode:
+                    self.logger.warning("Low memory mode activated. Creating minimal sparse matrices to save memory.")
+                    # Create minimal (empty) matrices to ensure the app can run
                     shape = (len(self.user_id_map), len(self.movie_id_map))
                     self.normalized_ratings = csr_matrix(shape)
                     self.user_movie_matrix = csr_matrix(shape)
                     self.movie_user_matrix = csr_matrix(shape)
                 else:
+                    # Proceed with loading matrices since we have enough memory
                     self.logger.info("Loading normalized ratings matrix...")
                     self.normalized_ratings = load_npz(
                         os.path.join(self.model_dir, "normalized_ratings.npz")
@@ -353,19 +354,13 @@ class MovieRecommender:
                         mem_user = psutil.Process().memory_info().rss / (1024 * 1024)
                         self.logger.info(f"Memory after user-movie matrix: {mem_user:.2f} MB")
                     
-                    # Skip movie-user matrix if memory is already too high
-                    if HAVE_PSUTIL and mem_user > 400 and low_memory_mode:
-                        self.logger.warning("Memory usage too high, skipping movie-user matrix")
-                        # Create empty placeholder
-                        self.movie_user_matrix = csr_matrix((1, 1))
-                    else:
-                        self.logger.info("Loading movie-user matrix...")
-                        self.movie_user_matrix = load_npz(
-                            os.path.join(self.model_dir, "movie_user_matrix.npz")
-                        )
-                        gc.collect()
+                    self.logger.info("Loading movie-user matrix...")
+                    self.movie_user_matrix = load_npz(
+                        os.path.join(self.model_dir, "movie_user_matrix.npz")
+                    )
+                    gc.collect()
             except Exception as e:
-                self.logger.error(f"Error loading matrices: {e}")
+                self.logger.error(f"Error loading matrices: {e}. Creating empty matrices as a fallback.")
                 # Create empty matrices as fallback
                 shape = (len(self.user_id_map), len(self.movie_id_map))
                 self.normalized_ratings = csr_matrix(shape)
@@ -395,15 +390,30 @@ class MovieRecommender:
         # Step 1: Load and process ratings data efficiently with Polars
         self.logger.info("Loading ratings data...")
         
+        extreme_optimization = self._check_memory_optimization()
+        if extreme_optimization:
+            self.logger.warning("EXTREME memory optimization mode enabled for training")
+
         # Load ratings data directly instead of using scan_parquet
-        self.ratings_pl = pl.read_parquet(self.ratings_file).filter(
-            pl.col("userId").is_not_null() & 
-            pl.col("tmdbId").is_not_null() & 
+        ratings_df = pl.read_parquet(self.ratings_file)
+
+        # If in extreme optimization mode, sample the data to reduce memory usage
+        if extreme_optimization:
+            self.logger.warning("Sampling 50% of ratings data for memory optimization")
+            # Use a fixed seed for reproducibility
+            ratings_df = ratings_df.sample(fraction=0.5, shuffle=False, seed=42)
+
+        self.ratings_pl = ratings_df.filter(
+            pl.col("userId").is_not_null() &
+            pl.col("tmdbId").is_not_null() &
             pl.col("rating").is_not_null()
         ).with_columns([
             pl.col("tmdbId").cast(pl.Int64),
             pl.col("userId").cast(pl.Int64)
         ])
+        # No need to keep the full dataframe in memory after filtering
+        del ratings_df
+        gc.collect()
         
         self.logger.info("Creating user and movie mappings...")
         
@@ -483,38 +493,43 @@ class MovieRecommender:
         # Get top 2000 most popular movies
         top_n = 2000
         top_movie_indices = np.argsort(self.movie_popularity)[-top_n:]
+
+        # Create a sub-matrix for the top movies
+        self.logger.info(f"Creating sub-matrix for top {top_n} movies.")
+        top_movies_matrix = self.movie_user_matrix[top_movie_indices]
+        
+        # Calculate cosine similarity for the sub-matrix
+        self.logger.info("Calculating cosine similarity for top movies...")
+        # This creates a dense matrix of size (top_n, top_n), which is acceptable for top_n=2000
+        similarities_matrix = cosine_similarity(top_movies_matrix)
         
         # Create a dictionary to store top similar movies for each popular movie
         self.top_similar_movies = {}
         
-        # For each popular movie, find its top 50 similar movies
-        for idx, movie_idx in enumerate(top_movie_indices):
-            if idx % 100 == 0:
-                self.logger.info(f"Processed {idx}/{len(top_movie_indices)} popular movies")
-                
-            movie_vector = self.movie_user_matrix[movie_idx]
+        # For each popular movie, find its top 50 similar movies from the matrix
+        self.logger.info("Finding top 50 similar movies for each popular movie...")
+        for i, movie_idx in enumerate(top_movie_indices):
+            # The row in similarities_matrix corresponds to the i-th movie in top_movie_indices
+            similarities = similarities_matrix[i]
             
-            # Calculate similarities with all other movies
-            similarities = []
+            # Get the indices of the top 51 most similar movies (to include itself)
+            # We sort descending and take the top 51
+            top_indices = np.argsort(similarities)[-51:][::-1]
             
-            for other_idx in top_movie_indices:
-                if other_idx != movie_idx:
-                    other_vector = self.movie_user_matrix[other_idx]
-                    
-                    # Calculate cosine similarity
-                    norm_a = np.sqrt(movie_vector.power(2).sum())
-                    norm_b = np.sqrt(other_vector.power(2).sum())
-                    
-                    if norm_a > 0 and norm_b > 0:
-                        dot_product = movie_vector.dot(other_vector.transpose())[0, 0]
-                        similarity = dot_product / (norm_a * norm_b)
-                        
-                        if similarity > 0:
-                            similarities.append((other_idx, similarity))
+            # Create list of (movie_id, similarity_score) tuples
+            similar_movies = []
+            for similar_i in top_indices:
+                original_movie_idx = top_movie_indices[similar_i]
+                # Don't include the movie itself in its list of similar movies
+                if original_movie_idx != movie_idx:
+                    similarity_score = similarities[similar_i]
+                    similar_movies.append((original_movie_idx, similarity_score))
             
-            # Sort by similarity and keep top 50
-            similarities.sort(key=lambda x: x[1], reverse=True)
-            self.top_similar_movies[movie_idx] = similarities[:50]
+            self.top_similar_movies[movie_idx] = similar_movies[:50]
+
+        # Clean up large matrix
+        del similarities_matrix
+        gc.collect()
         
         self.logger.info("Model training completed")
 
@@ -623,10 +638,17 @@ class MovieRecommender:
                 # Process in batches
                 for idx, sim in zip(top_indices, top_sims):
                     if sim > 0:
-                        user_ratings = self.user_movie_matrix[idx].toarray().flatten()
                         weight = sim ** 2
-                        weighted_sum += weight * user_ratings
-                        similarity_sum += weight * (user_ratings != 0)
+                        # Directly work with the sparse row to avoid dense conversion
+                        user_ratings_row = self.user_movie_matrix[idx]
+                        
+                        # Get column indices and data for non-zero elements
+                        movie_indices = user_ratings_row.indices
+                        ratings_data = user_ratings_row.data
+                        
+                        # Update weighted_sum and similarity_sum only for rated movies
+                        weighted_sum[movie_indices] += weight * ratings_data
+                        similarity_sum[movie_indices] += weight
                 
                 # Calculate predicted ratings
                 mask = similarity_sum > 0
