@@ -56,7 +56,7 @@ if ENV == "production":
     # Mount static files
     app.mount("/static", StaticFiles(directory=static_path), name="static")
 
-# Add at the start of your file, after creating the FastAPI app
+# Add at the start, after creating the FastAPI app
 app.movie_cache = {}
 
 # Add this function to prefetch genre data

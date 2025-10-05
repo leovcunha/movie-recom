@@ -21,7 +21,7 @@ const StarRating = ({ onRate, initialRating = 0, size = 20 }) => {
             className="star"
             size={size}
             color={ratingValue <= (hover || rating) ? "#ffc107" : "#e4e5e9"}
-            onClick={() => handleRate(ratingValue)}
+            onClick={(e) => { e.stopPropagation(); handleRate(ratingValue); }}
             onMouseEnter={() => setHover(ratingValue)}
             onMouseLeave={() => setHover(null)}
           />
@@ -31,4 +31,4 @@ const StarRating = ({ onRate, initialRating = 0, size = 20 }) => {
   );
 };
 
-export default StarRating; 
+export default StarRating;
