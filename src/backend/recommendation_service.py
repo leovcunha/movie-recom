@@ -26,9 +26,7 @@ class MovieRecommender:
     """
 
     def _check_memory_optimization(self) -> bool:
-        """
-        Check if extreme memory optimization is requested via environment variable.
-        """
+        """Check if extreme memory optimization is requested via environment variable."""
         return os.environ.get("EXTREME_MEMORY_OPTIMIZATION", "0") == "1"
 
     def __init__(self, ratings_file: str):
@@ -46,7 +44,7 @@ class MovieRecommender:
         self.model_dir = "model_cache"
         self.ratings_file = ratings_file
         self.api_cache_file = os.path.join(self.model_dir, "api_cache.json")
-        # self.movie_user_matrix will be set in train_model or load_model after self.user_movie_matrix is created
+        self.api_cache = {}
         
         try:
             # Force garbage collection before we start
@@ -156,8 +154,13 @@ class MovieRecommender:
                 pickle.dump(self.top_similar_movies, f)
             
             # Save API cache
-            with open(self.api_cache_file, 'w') as f:
-                json.dump(self.api_cache, f)
+            try:
+                api_cache_to_save = getattr(self, 'api_cache', {})
+                with open(self.api_cache_file, 'w') as f:
+                    json.dump(api_cache_to_save, f)
+            except Exception as e:
+                # Don't let save failures crash initialization; log and continue
+                self.logger.warning(f"Could not save api_cache: {e}")
             
             # Save mappings and other data
             mappings = {
@@ -399,28 +402,6 @@ class MovieRecommender:
         # Load ratings data directly instead of using scan_parquet
         ratings_df = pl.read_parquet(self.ratings_file)
 
-        # Limit to top 2,500 movies by rating count
-        movie_counts = ratings_df.groupby("tmdbId").agg(pl.count("rating").alias("count")).sort("count", descending=True)
-        top_movie_ids = movie_counts["tmdbId"][:2500].to_list()
-        ratings_df = ratings_df.filter(pl.col("tmdbId").is_in(top_movie_ids))
-
-        # For each movie, keep only up to 50 ratings
-        ratings_df = ratings_df.with_columns([
-            pl.col("tmdbId").cast(pl.Int64),
-            pl.col("userId").cast(pl.Int64)
-        ])
-        # Sort by tmdbId and userId for reproducibility
-        ratings_df = ratings_df.sort(["tmdbId", "userId"])
-        # Add a row number per movie
-        ratings_df = ratings_df.with_columns([
-            pl.col("tmdbId"),
-            pl.col("userId"),
-            pl.col("rating"),
-            pl.col("tmdbId").cumcount().over("tmdbId").alias("movie_row")
-        ])
-        ratings_df = ratings_df.filter(pl.col("movie_row") < 50)
-        ratings_df = ratings_df.drop(["movie_row"])
-
         # If in extreme optimization mode, sample the data to reduce memory usage
         if extreme_optimization:
             self.logger.warning("Sampling 50% of ratings data for memory optimization")
@@ -524,12 +505,8 @@ class MovieRecommender:
         
         # Calculate cosine similarity for the sub-matrix
         self.logger.info("Calculating cosine similarity for top movies...")
-        # Convert sparse matrix to dense for cosine_similarity
-        if hasattr(top_movies_matrix, 'toarray'):
-            top_movies_matrix_dense = top_movies_matrix.toarray()
-        else:
-            top_movies_matrix_dense = np.array(top_movies_matrix)
-        similarities_matrix = cosine_similarity(top_movies_matrix_dense)
+        # This creates a dense matrix of size (top_n, top_n), which is acceptable for top_n=2000
+        similarities_matrix = cosine_similarity(top_movies_matrix)
         
         # Create a dictionary to store top similar movies for each popular movie
         self.top_similar_movies = {}
@@ -667,14 +644,14 @@ class MovieRecommender:
                 for idx, sim in zip(top_indices, top_sims):
                     if sim > 0:
                         weight = sim ** 2
-                        # Use getrow for sparse matrix
-                        user_ratings_row = self.user_movie_matrix.getrow(idx)
-                        if hasattr(user_ratings_row, 'indices'):
-                            movie_indices = user_ratings_row.indices
-                            ratings_data = user_ratings_row.data
-                        else:
-                            movie_indices = np.nonzero(user_ratings_row)[0]
-                            ratings_data = user_ratings_row[movie_indices]
+                        # Directly work with the sparse row to avoid dense conversion
+                        user_ratings_row = self.user_movie_matrix[idx]
+                        
+                        # Get column indices and data for non-zero elements
+                        movie_indices = user_ratings_row.indices
+                        ratings_data = user_ratings_row.data
+                        
+                        # Update weighted_sum and similarity_sum only for rated movies
                         weighted_sum[movie_indices] += weight * ratings_data
                         similarity_sum[movie_indices] += weight
                 

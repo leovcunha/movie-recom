@@ -1,10 +1,8 @@
 import axios from 'axios';
 
-const BACKEND_URL = process.env.BACKEND_URL || 'http://localhost:8000';
-
 export const getRecommendations = async (ratings) => {
     try {
-        const response = await axios.post(`${BACKEND_URL}/api/recommendations`, {
+        const response = await axios.post(`/api/recommendations`, {
             ratings: ratings
         });
         return response;

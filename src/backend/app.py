@@ -56,6 +56,21 @@ if ENV == "production":
     # Mount static files
     app.mount("/static", StaticFiles(directory=static_path), name="static")
 
+    # Also mount the built assets at /built so index.html's /built/* requests resolve
+    built_path = os.path.join(static_path, "built")
+    if os.path.exists(built_path):
+        app.mount("/built", StaticFiles(directory=built_path), name="built")
+        logger.debug(f"Mounted built assets at /built from {built_path}")
+    else:
+        logger.warning(f"Built assets not found at {built_path}")
+
+    # Serve favicon if present
+    favicon_path = os.path.join(static_path, "favicon.ico")
+    if os.path.exists(favicon_path):
+        @app.get("/favicon.ico")
+        async def _favicon():
+            return FileResponse(favicon_path)
+
 # Add at the start, after creating the FastAPI app
 app.movie_cache = {}
 
