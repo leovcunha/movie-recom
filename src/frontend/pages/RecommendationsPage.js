@@ -1,11 +1,13 @@
 import React, { useEffect, useState } from 'react';
 import { Container, Alert, Row, Col, Card } from 'react-bootstrap';
+import { useNavigate } from 'react-router-dom';
 import StarRating from '../components/StarRating';
 import { getRecommendations } from '../actions/getRecommendations';
 import './RecommendationsPage.css';
 
-const RecommendationsPage = ({ onRate }) => {
+const RecommendationsPage = ({ onRate, onReset }) => {
   const [recommendations, setRecommendations] = useState([]);
+  const navigate = useNavigate();
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
 
@@ -70,10 +72,9 @@ const RecommendationsPage = ({ onRate }) => {
   };
 
   const handleReset = () => {
-    localStorage.removeItem('userRatings');
+    onReset(); // Notify parent to clear state
     setRecommendations([]);
-    // Optionally refresh the page to start completely fresh
-    window.location.reload();
+    navigate('/');
   };
 
   if (loading) {
@@ -84,39 +85,35 @@ const RecommendationsPage = ({ onRate }) => {
     );
   }
 
-  if (error) {
-    return (
-      <Container className="recommendations-container">
-        <Alert variant="danger">
-          {error}
-        </Alert>
-      </Container>
-    );
-  }
-
   return (
     <Container className="recommendations-container">
       <div className="recommendations-header">
         <h1>Your Personalized Recommendations</h1>
         <p>Based on your movie ratings</p>
-        {recommendations.length > 0 && (
-          <>
-            <button 
-              className="btn btn-primary mb-3 me-2" 
-              onClick={fetchRecommendations}
-            >
-              Refresh Recommendations
-            </button>
-            <button 
-              className="btn btn-warning mb-3" 
-              onClick={handleReset}
-            >
-              Reset All Ratings
-            </button>
-          </>
-        )}
+        <>
+          <button 
+            className="btn btn-primary mb-3 me-2" 
+            onClick={fetchRecommendations}
+          >
+            Refresh Recommendations
+          </button>
+          <button 
+            className="btn btn-warning mb-3" 
+            onClick={handleReset}
+          >
+            Reset All Ratings
+          </button>
+        </>
       </div>
       
+      {error && (
+        <Alert variant="danger">
+          Could not generate recommendations. Please try rating more movies or reset your ratings.
+          <br />
+          <small>Error: {error}</small>
+        </Alert>
+      )}
+
       {recommendations.length > 0 ? (
         <Row className="g-4">
           {recommendations.map((movie) => (
@@ -147,7 +144,7 @@ const RecommendationsPage = ({ onRate }) => {
           ))}
         </Row>
       ) : (
-        <Alert variant="info">
+        !error && <Alert variant="info">
           Rate at least 5 movies to get personalized recommendations!
         </Alert>
       )}

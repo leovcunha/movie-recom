@@ -712,6 +712,19 @@ async def search_movies(query: str, page: int = 1):
         raise HTTPException(status_code=500, detail=str(e))
 
 
+# Add a catch-all route for SPA routing in production
+if ENV == "production":
+    @app.get("/{full_path:path}")
+    async def serve_react_app(full_path: str):
+        """
+        Serve the React app for any path that is not an API endpoint.
+        This is necessary for client-side routing to work correctly on page reloads.
+        """
+        index_path = "static/index.html"
+        if os.path.exists(index_path):
+            return FileResponse(index_path)
+        raise HTTPException(status_code=404, detail="index.html not found")
+
 if __name__ == "__main__":
     import uvicorn
 

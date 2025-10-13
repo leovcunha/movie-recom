@@ -176,6 +176,25 @@ const App = () => {
         updateMovieRatings(movieId, rating);
     };
 
+    const handleResetRatings = () => {
+        setUserRatings({});
+        localStorage.removeItem('userRatings');
+        setShowRecommendations(false);
+
+        // Reset ratings on all currently loaded movies
+        const resetMovieRating = (movie) => ({ ...movie, userRating: 0 });
+
+        setPopularMovies(prev => ({ ...prev, results: prev.results.map(resetMovieRating) }));
+        setNewReleases(prev => ({ ...prev, results: prev.results.map(resetMovieRating) }));
+        setGenreMovies(prev => {
+            const updated = { ...prev };
+            Object.keys(updated).forEach(genreId => {
+                updated[genreId] = { ...updated[genreId], results: updated[genreId].results.map(resetMovieRating) };
+            });
+            return updated;
+        });
+    };
+
     const updateMovieRatings = (movieId, rating) => {
         setPopularMovies(prev => ({
             ...prev,
@@ -224,12 +243,13 @@ const App = () => {
                                 setPopularMovies={setPopularMovies}
                                 setNewReleases={setNewReleases}
                                 setGenreMovies={setGenreMovies}
+                                userRatings={userRatings}
                             />
                         } 
                     />
                     <Route 
                         path="/recommendations" 
-                        element={<RecommendationsPage onRate={handleRate} />} 
+                        element={<RecommendationsPage onRate={handleRate} onReset={handleResetRatings} />} 
                     />
                 </Routes>
             </div>
