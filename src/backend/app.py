@@ -3,8 +3,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from fastapi.staticfiles import StaticFiles
 from fastapi.responses import FileResponse
 from pydantic import BaseModel
-from typing import Dict
-from recommendation_service import MovieRecommender  # Changed to absolute import
+from typing import Dict, List
 import os
 import logging
 import requests
@@ -13,15 +12,20 @@ from datetime import datetime, timedelta
 import aiohttp
 import asyncio
 import gc  # Add garbage collection
+
+# Load environment variables from .env file FIRST
+load_dotenv()
+
+# Now import other modules that may depend on environment variables
+from recommendation_service import MovieRecommender
+from cold_start import get_imputed_ratings_for_missing_movies
+
 try:
     import psutil
     HAVE_PSUTIL = True
 except ImportError:
     HAVE_PSUTIL = False
 import numpy as np
-
-# Load environment variables from .env file
-load_dotenv()
 
 # Configure logging
 logging.basicConfig(level=logging.DEBUG)
@@ -211,35 +215,39 @@ async def get_recommendations(preferences: UserPreferences):
         recommendations = recommender.get_recommendations(preferences.ratings)
         logger.debug(f"Raw recommendations from model: {recommendations}")
         
+
         # Force garbage collection after getting recommendations
         gc.collect()
             
+
         # Check if movies exist in our dataset more accurately
         missing_movie_ids = []
         movie_ids_in_dataset = set(recommender.movie_map["tmdbId"].to_list())
         
+
         for movie_id in preferences.ratings:
             # Debug logging for movie existence check
             logger.debug(f"Checking movie {movie_id} in dataset")
             
+
             if movie_id not in movie_ids_in_dataset and preferences.ratings[movie_id] > 3.0:
                 missing_movie_ids.append(movie_id)
                 logger.debug(f"Movie {movie_id} not found in dataset")
                 
+
         if missing_movie_ids:
             logger.info(f"Movies not found in local data: {missing_movie_ids}")
-            
-            # Fetch similar movies for each missing movie
-            similar_movies = await fetch_similar_movies_from_tmdb(missing_movie_ids)
-            logger.debug(f"Similar movies fetched: {similar_movies}")
-            
-            # Add similar movies to recommendations
-            for movie_id, similar_movie_list in similar_movies.items():
-                for similar_movie in similar_movie_list:
-                    if 'recommendations' not in recommendations:
-                        recommendations['recommendations'] = {}
-                    recommendations['recommendations'][str(similar_movie['id'])] = round(similar_movie['vote_average'] / 2, 1)
-            
+
+            # HYBRID APPROACH: Find content-similar movies within our dataset
+            # and impute ratings to enhance the user profile.
+            imputed_ratings = await get_imputed_ratings_for_missing_movies(missing_movie_ids, preferences.ratings, recommender)
+            if imputed_ratings:
+                logger.info(f"Found {len(imputed_ratings)} proxy movies. Re-running recommendations with enriched profile.")
+                # Combine original ratings with the new imputed ratings
+                enriched_ratings = {**preferences.ratings, **imputed_ratings}
+                # Re-run the recommendation engine with the enriched user profile
+                recommendations = recommender.get_recommendations(enriched_ratings)
+
         if not recommendations or not recommendations.get('recommendations'):
             logger.warning("No recommendations generated")
             raise HTTPException(status_code=404, detail="No recommendations found")
@@ -250,10 +258,12 @@ async def get_recommendations(preferences: UserPreferences):
         # Fetch movie details for each recommendation
         recommended_movies = []
         
+
         # Process in smaller batches to prevent memory issues
         batch_size = 10
         all_items = list(recommendations['recommendations'].items())
         
+
         async with aiohttp.ClientSession() as session:
             for i in range(0, len(all_items), batch_size):
                 batch = all_items[i:i+batch_size]
@@ -267,8 +277,10 @@ async def get_recommendations(preferences: UserPreferences):
                     }
                     tasks.append(session.get(url, params=params))
                 
+
                 responses = await asyncio.gather(*tasks)
                 
+
                 for response, (movie_id, predicted_rating) in zip(responses, batch):
                     if response.status == 200:
                         movie_data = await response.json()
@@ -282,6 +294,7 @@ async def get_recommendations(preferences: UserPreferences):
                             'userRating': preferences.ratings.get(int(movie_id), 0)
                         })
                 
+
                 # Force garbage collection after each batch
                 gc.collect()
 
@@ -289,6 +302,7 @@ async def get_recommendations(preferences: UserPreferences):
         recommended_movies.sort(key=lambda x: x['predicted_rating'], reverse=True)
 
         # Force final garbage collection
+        # Force final garbage collection and return
         gc.collect()
         
         return recommended_movies
@@ -296,87 +310,6 @@ async def get_recommendations(preferences: UserPreferences):
     except Exception as e:
         logger.error(f"Error in recommendations endpoint: {e}")
         raise HTTPException(status_code=500, detail=str(e))
-
-async def fetch_similar_movies_from_tmdb(movie_ids: list[int], n: int = 3) -> Dict[int, list]:
-    """
-    Fetches similar movies from TMDB for a list of movie IDs, filtered to be within ±3 years 
-    of the original movie's release year and with a minimum rating of 3.5.
-    Optimized for lower memory usage.
-
-    Args:
-        movie_ids (list[int]): List of movie IDs for which to find similar movies.
-        n (int): Number of similar movies to return for each movie.
-
-    Returns:
-        Dict[int, list]: Dictionary of {movie_id: list of similar movies}
-    """
-    # Process at most 3 movies to save memory
-    movie_ids = movie_ids[:3]
-    
-    similar_movies_dict = {}
-    async with aiohttp.ClientSession() as session:
-        for movie_id in movie_ids:
-            # First get the original movie's release year
-            try:
-                url = f"https://api.themoviedb.org/3/movie/{movie_id}"
-                params = {
-                    "api_key": TMDB_API_KEY,
-                    "language": "en-US"
-                }
-                async with session.get(url, params=params) as response:
-                    if response.status == 200:
-                        movie_data = await response.json()
-                        release_date = movie_data.get('release_date', '')
-                        
-                        if release_date:
-                            release_year = int(release_date[:4])
-                            min_year = release_year - 3
-                            max_year = release_year + 3
-                            
-                            # Now get similar movies
-                            url = f"https://api.themoviedb.org/3/movie/{movie_id}/similar"
-                            params = {
-                                "api_key": TMDB_API_KEY,
-                                "language": "en-US",
-                                "page": "1"
-                            }
-                            async with session.get(url, params=params) as similar_response:
-                                if similar_response.status == 200:
-                                    data = await similar_response.json()
-                                    
-                                    # Filter similar movies efficiently with list comprehension
-                                    similar_movies = []
-                                    for movie in data.get('results', [])[:10]:  # Only check first 10 movies
-                                        if (movie.get('release_date', '') and 
-                                            min_year <= int(movie['release_date'][:4]) <= max_year and
-                                            movie.get('vote_average', 0)/2 >= 3.5):
-                                            # Only include essential fields
-                                            similar_movies.append({
-                                                'id': movie['id'],
-                                                'title': movie['title'],
-                                                'vote_average': movie['vote_average'],
-                                                'release_date': movie['release_date'][:4]
-                                            })
-                                            
-                                            # Break early if we have enough movies
-                                            if len(similar_movies) >= n:
-                                                break
-                                    
-                                    similar_movies_dict[movie_id] = similar_movies
-                                else:
-                                    similar_movies_dict[movie_id] = []
-                        else:
-                            similar_movies_dict[movie_id] = []
-                    else:
-                        similar_movies_dict[movie_id] = []
-            except Exception as e:
-                logger.error(f"Error fetching similar movies for {movie_id}: {e}")
-                similar_movies_dict[movie_id] = []
-                
-            # Force garbage collection after processing each movie
-            gc.collect()
-    
-    return similar_movies_dict
 
 
 @app.get("/health")

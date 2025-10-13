@@ -581,10 +581,6 @@ class MovieRecommender:
         try:
             # Import gc for garbage collection
             import gc
-            
-            # Track movies not found in our dataset
-            missing_movies = []
-            
             # Initial setup and validation - use float32 to save memory
             temp_user = np.zeros(len(self.movie_id_map), dtype=np.float32)
             valid_ratings = []
@@ -599,9 +595,6 @@ class MovieRecommender:
                     temp_user[idx] = rating
                     valid_ratings.append(rating)
                     rated_movies.add(movie_id)
-                else:
-                    # Track movies not in our dataset for API fallback
-                    missing_movies.append(movie_id)
             
             # Initialize recommendations dictionary
             recommendations = {}
@@ -733,21 +726,6 @@ class MovieRecommender:
                 del combined_predictions
                 gc.collect()
             
-            # PART 4: API RECOMMENDATIONS FOR MISSING MOVIES
-            # If we have missing movies or not enough recommendations, use API
-            api_recommendations = {}
-            
-            if missing_movies or len(recommendations) < n_recommendations:
-                # Get API recommendations for missing movies
-                api_recommendations = self.get_api_recommendations(
-                    missing_movies, 
-                    rated_movies,
-                    n_recommendations - len(recommendations)
-                )
-                
-                # Add API recommendations to our recommendations
-                recommendations.update(api_recommendations)
-            
             # Log timing
             end_time = time.time()
             self.logger.info(f"Recommendation generation took {end_time - start_time:.2f} seconds")
@@ -767,138 +745,6 @@ class MovieRecommender:
         finally:
             # Force garbage collection at the end
             gc.collect()
-
-    def get_api_recommendations(
-        self, 
-        missing_movies: List[int], 
-        rated_movies: Set[int],
-        n_needed: int
-    ) -> Dict[str, float]:
-        """
-        Get recommendations from TMDB API for movies not in our dataset.
-        
-        Args:
-            missing_movies: List of movie IDs not found in our dataset
-            rated_movies: Set of movie IDs already rated by the user
-            n_needed: Number of recommendations needed
-            
-        Returns:
-            Dictionary of movie IDs to predicted ratings
-        """
-        if not missing_movies or n_needed <= 0:
-            return {}
-            
-        try:
-            # TMDB API configuration
-            api_key = os.environ.get("TMDB_API_KEY", "")
-            if not api_key:
-                self.logger.warning("No TMDB API key found, skipping API recommendations")
-                return {}
-                
-            base_url = "https://api.themoviedb.org/3"
-            
-            # Get similar movies for each missing movie
-            similar_movies = {}
-            
-            # Set a timeout for API calls to avoid long waits
-            api_timeout = 2.0  # seconds
-            
-            for movie_id in missing_movies:
-                # Skip if we already have enough recommendations
-                if len(similar_movies) >= n_needed:
-                    break
-                
-                # Check if we have cached results for this movie
-                cache_key = str(movie_id)
-                if cache_key in self.api_cache:
-                    self.logger.info(f"Using cached API results for movie {movie_id}")
-                    cached_results = self.api_cache[cache_key]
-                    
-                    # Filter out movies already rated
-                    filtered_results = {
-                        tmdb_id: rating for tmdb_id, rating in cached_results.items()
-                        if int(tmdb_id) not in rated_movies
-                    }
-                    
-                    # Add to similar movies
-                    similar_movies.update(filtered_results)
-                    continue
-                
-                # Start API call timer
-                api_start_time = time.time()
-                
-                # Get movie details to get the title for logging
-                try:
-                    movie_url = f"{base_url}/movie/{movie_id}?api_key={api_key}"
-                    movie_response = requests.get(movie_url, timeout=api_timeout)
-                    
-                    if movie_response.status_code == 200:
-                        movie_data = movie_response.json()
-                        movie_title = movie_data.get("title", f"Movie {movie_id}")
-                        self.logger.info(f"Fetching similar movies for: {movie_title} ({movie_data.get('release_date', '')[:4]})")
-                        
-                        # Get similar movies
-                        similar_url = f"{base_url}/movie/{movie_id}/similar?api_key={api_key}"
-                        similar_response = requests.get(similar_url, timeout=api_timeout)
-                        
-                        if similar_response.status_code == 200:
-                            similar_data = similar_response.json()
-                            results = similar_data.get("results", [])
-                            
-                            # Filter out movies already rated
-                            filtered_results = [
-                                movie for movie in results 
-                                if movie.get("id") not in rated_movies
-                            ]
-                            
-                            # Cache the results
-                            movie_cache = {}
-                            
-                            # Add to similar movies with a high rating (these are API recommendations)
-                            for movie in filtered_results:
-                                tmdb_id = movie.get("id")
-                                # Use vote_average as a basis for our rating, scaled to our 1-5 range
-                                vote_average = movie.get("vote_average", 5.0)
-                                # Scale from TMDB's 0-10 to our 1-5
-                                scaled_rating = 1.0 + (vote_average / 10.0) * 4.0
-                                # Boost a bit since these are similar to movies the user liked
-                                boosted_rating = min(5.0, scaled_rating * 1.1)
-                                
-                                # Add to results and cache
-                                similar_movies[str(tmdb_id)] = round(boosted_rating, 2)
-                                movie_cache[str(tmdb_id)] = round(boosted_rating, 2)
-                            
-                            # Update cache
-                            self.api_cache[cache_key] = movie_cache
-                            
-                            # Save cache periodically
-                            with open(self.api_cache_file, 'w') as f:
-                                json.dump(self.api_cache, f)
-                            
-                            self.logger.info(f"Found {len(filtered_results)} similar movies for {movie_title}")
-                        else:
-                            self.logger.warning(f"Failed to get similar movies for {movie_id}: {similar_response.status_code}")
-                    else:
-                        self.logger.warning(f"Failed to get movie details for {movie_id}: {movie_response.status_code}")
-                
-                except requests.exceptions.Timeout:
-                    self.logger.warning(f"API request timed out for movie {movie_id}")
-                except Exception as e:
-                    self.logger.warning(f"Error in API request for movie {movie_id}: {str(e)}")
-                
-                # Check if we've spent too much time on API calls
-                api_elapsed = time.time() - api_start_time
-                if api_elapsed > 5.0:  # If a single movie takes more than 5 seconds, stop API calls
-                    self.logger.warning(f"API calls taking too long ({api_elapsed:.2f}s), skipping remaining movies")
-                    break
-            
-            # Return the similar movies as recommendations
-            self.logger.info(f"Found {len(similar_movies)} similar movies across {len(missing_movies)} input movies")
-            return similar_movies
-            
-        except Exception as e:
-            self.logger.error(f"Error getting API recommendations: {str(e)}")
-            return {}
 
     def log_data_statistics(self, full_stats=False):
         """
